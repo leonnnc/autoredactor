@@ -1,5 +1,12 @@
 import pptxgen from "pptxgenjs";
 
+window.onerror = function(message, source, lineno, colno, error) {
+  alert("ERROR DETECTADO: " + message + " en linea " + lineno);
+};
+window.addEventListener("unhandledrejection", function(event) {
+  alert("PROMESA RECHAZADA: " + event.reason);
+});
+
 // DOM Elements
 const editor = document.getElementById("editor");
 const slidePreview = document.getElementById("slide-preview");
@@ -114,9 +121,38 @@ function parseTextToSlides(rawText) {
 
 // --- LOGIC: UI Update ---
 
+let previewObserver = null;
+
 function applySlideRatio() {
-  // El selector de formato se guarda para la exportación a PowerPoint,
-  // pero en la interfaz web forzamos que llene todo el cuadro disponible.
+  const ratioStr = state.layoutRatio || "16/9";
+  const parts = ratioStr.split('/');
+  const ratio = parseFloat(parts[0]) / parseFloat(parts[1]);
+  
+  const container = document.querySelector('.preview-container');
+  if (!container) return;
+
+  if (previewObserver) previewObserver.disconnect();
+  
+  previewObserver = new ResizeObserver(entries => {
+    for (let entry of entries) {
+      const cw = entry.contentRect.width;
+      const ch = entry.contentRect.height;
+      let w = cw;
+      let h = cw / ratio;
+      
+      if (h > ch) {
+        h = ch;
+        w = ch * ratio;
+      }
+      
+      slidePreview.style.width = `${w}px`;
+      slidePreview.style.height = `${h}px`;
+      slidePreview.style.setProperty("width", `${w}px`, "important");
+      slidePreview.style.setProperty("height", `${h}px`, "important");
+    }
+  });
+  
+  previewObserver.observe(container);
 }
 
 // Observar el contenedor ya no es estrictamente necesario para el cálculo
