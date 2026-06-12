@@ -28,7 +28,6 @@ const bibleSearchInput = document.getElementById("bible-search-input");
 const bibleSearchBtn = document.getElementById("bible-search-btn");
 const bibleSearchResult = document.getElementById("bible-search-result");
 const bibleInsertBtn = document.getElementById("bible-insert-btn");
-const slideFormatSelect = document.getElementById("slide-format");
 
 // Individual Slide Controls
 const slideValignSelect = document.getElementById("slide-valign");
@@ -42,8 +41,7 @@ let state = {
   fontFamily: "'Inter', sans-serif",
   fontSize: 32,
   bgColor: "#1a1a2e",
-  bgImage: null,
-  layoutRatio: "16/9"
+  bgImage: null
 };
 
 // --- LOGIC: Parsing ---
@@ -122,45 +120,7 @@ function parseTextToSlides(rawText) {
 
 // --- LOGIC: UI Update ---
 
-let previewObserver = null;
-
-function applySlideRatio() {
-  const ratioStr = state.layoutRatio || "16/9";
-  const parts = ratioStr.split('/');
-  const ratio = parseFloat(parts[0]) / parseFloat(parts[1]);
-  
-  const container = document.querySelector('.preview-container');
-  if (!container) return;
-
-  if (previewObserver) previewObserver.disconnect();
-  
-  previewObserver = new ResizeObserver(entries => {
-    for (let entry of entries) {
-      const cw = entry.contentRect.width;
-      const ch = entry.contentRect.height;
-      let w = cw;
-      let h = cw / ratio;
-      
-      if (h > ch) {
-        h = ch;
-        w = ch * ratio;
-      }
-      
-      slidePreview.style.width = `${w}px`;
-      slidePreview.style.height = `${h}px`;
-      slidePreview.style.setProperty("width", `${w}px`, "important");
-      slidePreview.style.setProperty("height", `${h}px`, "important");
-    }
-  });
-  
-  previewObserver.observe(container);
-}
-
-// Observar el contenedor ya no es estrictamente necesario para el cálculo
-// pero lo dejamos vacío o lo limpiamos.
 function updatePreview() {
-  applySlideRatio();
-  
   if (state.slides.length === 0) {
     slideContent.innerText = "El texto de la diapositiva aparecerá aquí...";
     slideIndicator.innerText = "Diapositiva 0 / 0";
@@ -313,11 +273,6 @@ bibleInsertBtn.addEventListener("click", () => {
   editor.focus();
 });
 
-slideFormatSelect.addEventListener("change", (e) => {
-  state.layoutRatio = e.target.value;
-  applySlideRatio();
-});
-
 // Individual Slide Listeners
 slideValignSelect.addEventListener("change", (e) => {
   if (state.slides.length > 0) {
@@ -397,15 +352,7 @@ downloadBtn.addEventListener("click", async () => {
   }
 
   const pres = new pptxgen();
-  
-  if (state.layoutRatio === "16/9") {
-    pres.layout = 'LAYOUT_16x9';
-  } else if (state.layoutRatio === "4/3") {
-    pres.layout = 'LAYOUT_4x3';
-  } else if (state.layoutRatio === "1/1") {
-    pres.defineLayout({ name: 'SQUARE', width: 10, height: 10 });
-    pres.layout = 'SQUARE';
-  }
+  pres.layout = 'LAYOUT_16x9';
 
   state.slides.forEach(slideObj => {
     const slide = pres.addSlide();
