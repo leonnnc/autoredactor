@@ -1,6 +1,7 @@
 import pptxgen from "pptxgenjs";
 
 window.onerror = function(message, source, lineno, colno, error) {
+  if (message.includes("ResizeObserver loop")) return true;
   alert("ERROR DETECTADO: " + message + " en linea " + lineno);
 };
 window.addEventListener("unhandledrejection", function(event) {
