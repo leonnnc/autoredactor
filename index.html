@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoRedactor de Diapositivas</title>
+    <!-- Google Fonts for modern typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Google Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <h1>AutoRedactor</h1>
+        <p>Procesador automático de texto y versículos para diapositivas</p>
+      </header>
+
+      <main class="app-main">
+        <!-- Izquierda: Editor -->
+        <section class="panel panel-left">
+          <div class="panel-header">
+            <h2 style="margin: 0;"><span class="material-icons-round">edit_note</span> Editor</h2>
+          </div>
+          
+          <!-- Buscador de Biblia -->
+          <div class="bible-search-box" style="padding: 1rem; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-color);">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem; font-weight: 500;">Buscador de Biblia (RV1960)</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="bible-search-input" placeholder="Ej: jn 3:16" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.6); color: white; font-family: inherit;">
+              <button id="bible-search-btn" class="btn-primary" style="padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 5px;">
+                <span class="material-icons-round" style="font-size: 1.1rem;">search</span> Buscar
+              </button>
+            </div>
+            <div id="bible-search-result" style="margin-top: 0.8rem; font-size: 0.9rem; color: #e2e8f0; display: none; background: rgba(255,255,255,0.05); padding: 0.8rem; border-radius: 8px; border-left: 3px solid var(--primary);">
+            </div>
+            <button id="bible-insert-btn" class="btn-primary" style="margin-top: 0.5rem; width: 100%; display: none; background: linear-gradient(135deg, #10b981, #059669); justify-content: center;">
+              <span class="material-icons-round" style="font-size: 1.1rem;">add_circle</span> Insertar en el texto
+            </button>
+          </div>
+
+          <textarea id="editor" placeholder="Pega tu texto aquí (admite versículos y texto plano)..."></textarea>
+        </section>
+
+        <!-- Centro: Previsualización -->
+        <section class="panel panel-center">
+          <div class="panel-header">
+            <h2><span class="material-icons-round">slideshow</span> Vista Previa</h2>
+          </div>
+          
+          <div class="preview-container">
+            <div id="slide-preview" class="slide-preview" style="background-color: #1a1a2e; color: #ffffff; font-family: 'Inter', sans-serif; font-size: 32px;">
+              <div class="slide-content" id="slide-content">
+                El texto de la diapositiva aparecerá aquí...
+              </div>
+            </div>
+          </div>
+          
+          <div style="text-align: center; padding: 0.6rem; background: rgba(0,0,0,0.2); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+            <label for="slide-format" style="font-size: 0.85rem; color: var(--text-muted); margin-right: 10px; font-weight: 500;">Formato / Resolución:</label>
+            <select id="slide-format" style="width: auto; display: inline-block; padding: 0.4rem; font-size: 0.85rem; background: rgba(15,23,42,0.8);">
+              <option value="16/9">16:9 (Panorámico Moderno)</option>
+              <option value="4/3">4:3 (Estándar Antiguo)</option>
+              <option value="1/1">1:1 (Cuadrado / Instagram)</option>
+            </select>
+          </div>
+
+          <div class="slide-navigation">
+            <button id="btn-prev" class="btn-icon" disabled><span class="material-icons-round">chevron_left</span></button>
+            <span id="slide-indicator">Diapositiva 0 / 0</span>
+            <button id="btn-next" class="btn-icon" disabled><span class="material-icons-round">chevron_right</span></button>
+          </div>
+        </section>
+
+        <!-- Derecha: Controles -->
+        <section class="panel panel-right" style="display: flex; flex-direction: column; overflow: hidden;">
+          <div class="panel-header" style="flex-shrink: 0;">
+            <h2 style="margin: 0;"><span class="material-icons-round">tune</span> Ajustes</h2>
+          </div>
+
+          <div style="flex: 1; overflow-y: auto; padding-top: 1.5rem;">
+            <div class="control-group">
+              <label for="font-family">Tipografía</label>
+              <select id="font-family">
+                <option value="'Inter', sans-serif">Inter</option>
+                <option value="'Roboto', sans-serif">Roboto</option>
+                <option value="'Outfit', sans-serif">Outfit</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label for="font-size">Tamaño de Texto (px)</label>
+              <div class="range-slider">
+                <input type="range" id="font-size" min="16" max="72" value="32">
+                <span id="font-size-val">32px</span>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label for="bg-upload">Subir Fondo (Imagen)</label>
+              <label class="file-upload-btn">
+                <input type="file" id="bg-upload" accept="image/png, image/jpeg, image/webp">
+                <span class="material-icons-round">add_photo_alternate</span> Seleccionar Imagen
+              </label>
+              <button id="clear-bg-btn" class="btn-secondary" style="margin-top: 0.5rem; width: 100%; display: none;">Quitar Fondo Personalizado</button>
+            </div>
+
+            <div class="control-group">
+              <label>Fondos Predefinidos</label>
+              <div class="bg-presets" id="bg-presets">
+                <button class="preset-btn active" data-bg="#1a1a2e">Oscuro</button>
+                <button class="preset-btn" data-bg="#800000">Fiestas Patrias</button>
+                <button class="preset-btn" data-bg="#004d00">Navidad</button>
+                <button class="preset-btn" data-bg="#000080">Año Nuevo</button>
+                <button class="preset-btn" data-bg="#4d004d">Semana Santa</button>
+              </div>
+            </div>
+
+            <div class="panel-header" style="margin-top: 1rem; border-top: 1px solid var(--border-color);">
+              <h2><span class="material-icons-round">format_align_center</span> Esta Diapositiva</h2>
+            </div>
+
+            <div class="control-group" style="padding-top: 1rem;">
+              <label for="slide-valign">Alineación Vertical</label>
+              <select id="slide-valign">
+                <option value="flex-start">Arriba</option>
+                <option value="center">Centro</option>
+                <option value="flex-end">Abajo</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label for="slide-offset">Ajuste de Altura (Subir/Bajar)</label>
+              <div class="range-slider">
+                <input type="range" id="slide-offset" min="-200" max="200" value="0">
+                <span id="slide-offset-val">0px</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex-shrink: 0; padding: 1.5rem; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.2);">
+            <label style="display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.5rem; font-weight: 500;">Formato de Descarga:</label>
+            <select id="download-format" style="margin-bottom: 1rem; width: 100%;">
+              <option value="pptx">PowerPoint (.pptx)</option>
+              <option value="pdf">Documento PDF (.pdf) - Pronto</option>
+              <option value="jpg">Imágenes (.jpg) - Pronto</option>
+            </select>
+            <button id="download-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 1rem; padding: 0.8rem;">
+              <span class="material-icons-round">download</span> Descargar
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+    
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
