@@ -143,9 +143,9 @@ function updatePreview() {
     slideContent.style.transform = `translateY(${currentSlide.offsetY || 0}px)`;
 
     // Update individual slide UI inputs
-    slideValignSelect.value = currentSlide.valign || "center";
-    slideOffsetInput.value = currentSlide.offsetY || 0;
-    slideOffsetVal.innerText = `${currentSlide.offsetY || 0}px`;
+    if (slideValignSelect) slideValignSelect.value = currentSlide.valign || "center";
+    if (slideOffsetInput) slideOffsetInput.value = currentSlide.offsetY || 0;
+    if (slideOffsetVal) slideOffsetVal.innerText = `${currentSlide.offsetY || 0}px`;
   }
 
   // Global Styles
