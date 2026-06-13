@@ -359,3 +359,38 @@ select:focus {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Intro Screen */
+.intro-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0f172a;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.intro-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.intro-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 4rem;
+  font-weight: 700;
+  color: #f8fafc;
+  opacity: 0;
+  transform: scale(0.9);
+  animation: popIn 0.15s forwards;
+}
+
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}

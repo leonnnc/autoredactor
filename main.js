@@ -8,6 +8,32 @@ window.addEventListener("unhandledrejection", function(event) {
   alert("PROMESA RECHAZADA: " + event.reason);
 });
 
+// Intro Animation Logic
+document.addEventListener("DOMContentLoaded", () => {
+  const introWords = ["Welcome", "Bienvenido", "Bienvenue", "Willkommen", "Benvenuto", "Bem-vindo", "欢迎", "AutoRedactor"];
+  const introScreen = document.getElementById("intro-screen");
+  const introText = document.getElementById("intro-text");
+
+  if (introScreen && introText) {
+    let wordIdx = 0;
+    const introInterval = setInterval(() => {
+      wordIdx++;
+      if (wordIdx < introWords.length) {
+        introText.innerText = introWords[wordIdx];
+        introText.style.animation = 'none';
+        void introText.offsetWidth; // Trigger reflow
+        introText.style.animation = 'popIn 0.12s forwards';
+      } else {
+        clearInterval(introInterval);
+        introScreen.classList.add("hidden");
+        setTimeout(() => {
+          if (introScreen.parentNode) introScreen.parentNode.removeChild(introScreen);
+        }, 400);
+      }
+    }, 150); // Fast succession (150ms per word)
+  }
+});
+
 // DOM Elements
 const editor = document.getElementById("editor");
 const slidePreview = document.getElementById("slide-preview");
