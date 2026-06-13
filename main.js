@@ -16,12 +16,15 @@ const btnPrev = document.getElementById("btn-prev");
 const btnNext = document.getElementById("btn-next");
 const slideIndicator = document.getElementById("slide-indicator");
 const fontFamilySelect = document.getElementById("font-family");
-const fontSizeInput = document.getElementById("font-size");
+const fontSizeSlider = document.getElementById("font-size");
 const fontSizeVal = document.getElementById("font-size-val");
 const bgUpload = document.getElementById("bg-upload");
-const bgPresets = document.getElementById("bg-presets");
 const clearBgBtn = document.getElementById("clear-bg-btn");
-const downloadBtn = document.getElementById("download-btn");
+const bgPresets = document.querySelectorAll(".preset-btn");
+
+const bgColorPicker = document.getElementById("bg-color-picker");
+const gradColor1 = document.getElementById("grad-color-1");
+const gradColor2 = document.getElementById("grad-color-2");
 
 // Bible Search Elements
 const bibleSearchInput = document.getElementById("bible-search-input");
@@ -40,7 +43,9 @@ let state = {
   currentSlideIdx: 0,
   fontFamily: "'Inter', sans-serif",
   fontSize: 32,
+  bgType: "preset", // 'preset', 'color', 'gradient', 'image'
   bgColor: "#1a1a2e",
+  bgGradient: { c1: "#1e3a8a", c2: "#0f172a" },
   bgImage: null
 };
 
@@ -147,13 +152,16 @@ function updatePreview() {
 
   // Global Styles
   slidePreview.style.fontFamily = state.fontFamily;
-  slidePreview.style.fontSize = `${state.fontSize}px`;
+  slidePreview.style.fontSize = state.fontSize + 'px';
   
-  if (state.bgImage) {
+  if (state.bgType === "image" && state.bgImage) {
     slidePreview.style.backgroundImage = `url(${state.bgImage})`;
-    slidePreview.style.backgroundColor = "transparent";
+    slidePreview.style.backgroundColor = 'transparent';
+  } else if (state.bgType === "gradient") {
+    slidePreview.style.backgroundImage = `linear-gradient(to bottom, ${state.bgGradient.c1}, ${state.bgGradient.c2})`;
+    slidePreview.style.backgroundColor = 'transparent';
   } else {
-    slidePreview.style.backgroundImage = "none";
+    slidePreview.style.backgroundImage = 'none';
     slidePreview.style.backgroundColor = state.bgColor;
   }
 }
@@ -296,22 +304,10 @@ fontFamilySelect.addEventListener("change", (e) => {
   updatePreview();
 });
 
-fontSizeInput.addEventListener("input", (e) => {
+fontSizeSlider.addEventListener("input", (e) => {
   state.fontSize = e.target.value;
   fontSizeVal.innerText = `${state.fontSize}px`;
   updatePreview();
-});
-
-// Background Presets
-bgPresets.addEventListener("click", (e) => {
-  if (e.target.classList.contains("preset-btn")) {
-    document.querySelectorAll(".preset-btn").forEach(btn => btn.classList.remove("active"));
-    e.target.classList.add("active");
-    
-    state.bgImage = null;
-    state.bgColor = e.target.dataset.bg;
-    updatePreview();
-  }
 });
 
 // Background Image Upload
@@ -319,9 +315,11 @@ bgUpload.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) {
     const reader = new FileReader();
-    reader.onload = function(event) {
+    reader.onload = (event) => {
+      state.bgType = "image";
       state.bgImage = event.target.result;
-      document.querySelectorAll(".preset-btn").forEach(btn => btn.classList.remove("active"));
+      clearBgBtn.style.display = "block";
+      bgPresets.forEach(b => b.classList.remove("active"));
       updatePreview();
     };
     reader.readAsDataURL(file);
@@ -329,13 +327,59 @@ bgUpload.addEventListener("change", (e) => {
 });
 
 clearBgBtn.addEventListener("click", () => {
+  state.bgType = "preset";
   state.bgImage = null;
+  state.bgColor = "#1a1a2e";
+  clearBgBtn.style.display = "none";
   bgUpload.value = "";
-  document.querySelector(".preset-btn").click();
+  bgPresets.forEach(b => b.classList.remove("active"));
+  document.querySelector('.preset-btn[data-bg="#1a1a2e"]')?.classList.add("active");
+  updatePreview();
+});
+
+bgPresets.forEach(btn => {
+  btn.addEventListener("click", () => {
+    state.bgType = "preset";
+    state.bgColor = btn.getAttribute("data-bg");
+    state.bgImage = null;
+    clearBgBtn.style.display = "none";
+    bgUpload.value = "";
+    
+    bgPresets.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    updatePreview();
+  });
+});
+
+bgColorPicker.addEventListener("input", (e) => {
+  state.bgType = "color";
+  state.bgColor = e.target.value;
+  state.bgImage = null;
+  clearBgBtn.style.display = "none";
+  bgPresets.forEach(b => b.classList.remove("active"));
+  updatePreview();
+});
+
+gradColor1.addEventListener("input", (e) => {
+  state.bgType = "gradient";
+  state.bgGradient.c1 = e.target.value;
+  state.bgImage = null;
+  clearBgBtn.style.display = "none";
+  bgPresets.forEach(b => b.classList.remove("active"));
+  updatePreview();
+});
+
+gradColor2.addEventListener("input", (e) => {
+  state.bgType = "gradient";
+  state.bgGradient.c2 = e.target.value;
+  state.bgImage = null;
+  clearBgBtn.style.display = "none";
+  bgPresets.forEach(b => b.classList.remove("active"));
   updatePreview();
 });
 
 // --- PPTX EXPORT ---
+const downloadBtn = document.getElementById("download-btn");
 const downloadFormat = document.getElementById("download-format");
 
 downloadBtn.addEventListener("click", async () => {
@@ -357,8 +401,13 @@ downloadBtn.addEventListener("click", async () => {
   state.slides.forEach(slideObj => {
     const slide = pres.addSlide();
     
-    if (state.bgImage) {
+    if (state.bgType === "image" && state.bgImage) {
       slide.background = { data: state.bgImage }; 
+    } else if (state.bgType === "gradient") {
+      slide.addShape(pres.ShapeType.rect, {
+        x: 0, y: 0, w: '100%', h: '100%',
+        fill: { type: 'gradient', color: state.bgGradient.c1.replace("#", ""), alpha: 100, color2: state.bgGradient.c2.replace("#", ""), alpha2: 100, angle: 270 }
+      });
     } else {
       slide.background = { color: state.bgColor.replace("#", "") };
     }
