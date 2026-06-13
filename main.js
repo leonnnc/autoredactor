@@ -69,6 +69,8 @@ let state = {
   currentSlideIdx: 0,
   fontFamily: "'Inter', sans-serif",
   fontSize: 32,
+  valign: "center",
+  offsetY: 0,
   bgType: "preset", // 'preset', 'color', 'gradient', 'image'
   bgColor: "#1a1a2e",
   bgGradient: { c1: "#1e3a8a", c2: "#0f172a" },
@@ -165,16 +167,15 @@ function updatePreview() {
     slideIndicator.innerText = `Diapositiva ${state.currentSlideIdx + 1} / ${state.slides.length}`;
     btnPrev.disabled = state.currentSlideIdx === 0;
     btnNext.disabled = state.currentSlideIdx === state.slides.length - 1;
-
-    // Apply individual slide settings
-    slidePreview.style.alignItems = currentSlide.valign || "center";
-    slideContent.style.transform = `translateY(${currentSlide.offsetY || 0}px)`;
-
-    // Update individual slide UI inputs
-    if (slideValignSelect) slideValignSelect.value = currentSlide.valign || "center";
-    if (slideOffsetInput) slideOffsetInput.value = currentSlide.offsetY || 0;
-    if (slideOffsetVal) slideOffsetVal.innerText = `${currentSlide.offsetY || 0}px`;
   }
+
+  // Global Settings Apply
+  slidePreview.style.alignItems = state.valign;
+  slideContent.style.transform = `translateY(${state.offsetY}px)`;
+  
+  if (slideValignSelect) slideValignSelect.value = state.valign;
+  if (slideOffsetInput) slideOffsetInput.value = state.offsetY;
+  if (slideOffsetVal) slideOffsetVal.innerText = `${state.offsetY}px`;
 
   // Global Styles
   slidePreview.style.fontFamily = state.fontFamily;
@@ -205,7 +206,7 @@ editor.addEventListener("input", (e) => {
   state.slides = newTexts.map(t => {
     const old = oldSlidesMap.get(t);
     if (old) return old;
-    return { text: t, valign: "center", offsetY: 0 };
+    return { text: t };
   });
 
   if (state.currentSlideIdx >= state.slides.length) {
@@ -307,20 +308,16 @@ bibleInsertBtn.addEventListener("click", () => {
   editor.focus();
 });
 
-// Individual Slide Listeners
+// Global Position Listeners
 slideValignSelect.addEventListener("change", (e) => {
-  if (state.slides.length > 0) {
-    state.slides[state.currentSlideIdx].valign = e.target.value;
-    updatePreview();
-  }
+  state.valign = e.target.value;
+  updatePreview();
 });
 
 slideOffsetInput.addEventListener("input", (e) => {
-  if (state.slides.length > 0) {
-    state.slides[state.currentSlideIdx].offsetY = parseInt(e.target.value, 10);
-    slideOffsetVal.innerText = `${e.target.value}px`;
-    updatePreview(); // this will apply the transform
-  }
+  state.offsetY = parseInt(e.target.value, 10);
+  slideOffsetVal.innerText = `${state.offsetY}px`;
+  updatePreview();
 });
 
 
@@ -445,8 +442,8 @@ downloadBtn.addEventListener("click", async () => {
 
     // Map CSS flex to PPTX valign
     let pptxValign = 'middle';
-    if (slideObj.valign === 'flex-start') pptxValign = 'top';
-    if (slideObj.valign === 'flex-end') pptxValign = 'bottom';
+    if (state.valign === 'flex-start') pptxValign = 'top';
+    if (state.valign === 'flex-end') pptxValign = 'bottom';
 
     // Calculate approx Y based on offset
     // 16x9 layout defaults to 10 width x 5.625 height in inches
@@ -457,7 +454,7 @@ downloadBtn.addEventListener("click", async () => {
     else baseY = 2.8; // middle approx
 
     // rough px to inches conversion for offset (assume 72dpi -> 1px = ~0.0138 inches)
-    const offsetInches = (slideObj.offsetY || 0) * 0.0138;
+    const offsetInches = state.offsetY * 0.0138;
 
     slide.addText(slideObj.text, {
       x: 0.5, 
