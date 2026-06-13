@@ -1,4 +1,8 @@
 import pptxgen from "pptxgenjs";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 window.onerror = function(message, source, lineno, colno, error) {
   if (message.includes("ResizeObserver loop")) return true;
@@ -407,75 +411,147 @@ const downloadFormat = document.getElementById("download-format");
 
 downloadBtn.addEventListener("click", async () => {
   const format = downloadFormat ? downloadFormat.value : "pptx";
-  
-  if (format !== "pptx") {
-    alert("¡Hola! Por ahora la aplicación está optimizada para generar presentaciones editables (.pptx). Para obtener un PDF o JPG con la mejor calidad, te recomiendo descargar el PowerPoint y guardarlo como PDF o Imagen desde allí. ¡Pronto añadiremos la exportación directa!");
-    return;
-  }
 
   if (state.slides.length === 0) {
     alert("No hay diapositivas para exportar. Por favor pega algo de texto.");
     return;
   }
 
-  const pres = new pptxgen();
-  pres.layout = 'LAYOUT_16x9';
+  const originalText = downloadBtn.innerHTML;
 
-  state.slides.forEach(slideObj => {
-    const slide = pres.addSlide();
+  if (format === "pptx") {
+    downloadBtn.innerText = "Generando PPTX...";
+    downloadBtn.disabled = true;
+    try {
+      const pres = new pptxgen();
+      pres.layout = 'LAYOUT_16x9';
     
-    if (state.bgType === "image" && state.bgImage) {
-      slide.background = { data: state.bgImage }; 
-    } else if (state.bgType === "gradient") {
-      slide.addShape(pres.ShapeType.rect, {
-        x: 0, y: 0, w: '100%', h: '100%',
-        fill: { type: 'gradient', color: state.bgGradient.c1.replace("#", ""), alpha: 100, color2: state.bgGradient.c2.replace("#", ""), alpha2: 100, angle: 270 }
+      state.slides.forEach(slideObj => {
+        const slide = pres.addSlide();
+        
+        if (state.bgType === "image" && state.bgImage) {
+          slide.background = { data: state.bgImage }; 
+        } else if (state.bgType === "gradient") {
+          slide.addShape(pres.ShapeType.rect, {
+            x: 0, y: 0, w: '100%', h: '100%',
+            fill: { type: 'gradient', color: state.bgGradient.c1.replace("#", ""), alpha: 100, color2: state.bgGradient.c2.replace("#", ""), alpha2: 100, angle: 270 }
+          });
+        } else {
+          slide.background = { color: state.bgColor.replace("#", "") };
+        }
+    
+        slide.addShape(pres.ShapeType.rect, {
+          x: 0, y: 0, w: '100%', h: '100%',
+          fill: { color: '000000', transparency: 70 }
+        });
+    
+        let pptxValign = 'middle';
+        if (state.valign === 'flex-start') pptxValign = 'top';
+        if (state.valign === 'flex-end') pptxValign = 'bottom';
+    
+        let baseY = 0;
+        if (pptxValign === 'top') baseY = 0.5;
+        else if (pptxValign === 'bottom') baseY = 4.5;
+        else baseY = 2.8;
+    
+        const offsetInches = state.offsetY * 0.0138;
+    
+        slide.addText(slideObj.text, {
+          x: 0.5, 
+          y: (pptxValign === 'middle') ? '50%' : (baseY + offsetInches),
+          w: '90%', 
+          h: (pptxValign === 'middle') ? '90%' : 'auto',
+          align: 'center',
+          valign: pptxValign,
+          fontSize: parseInt(state.fontSize),
+          fontFace: state.fontFamily.replace(/'/g, '').split(',')[0],
+          color: 'FFFFFF',
+          breakLine: true,
+          fit: 'shrink'
+        });
       });
-    } else {
-      slide.background = { color: state.bgColor.replace("#", "") };
+    
+      await pres.writeFile({ fileName: 'Diapositivas_AutoRedactor.pptx' });
+    } catch (err) {
+      console.error("Error al exportar PPTX:", err);
+      alert("Ocurrió un error al exportar la presentación.");
+    } finally {
+      downloadBtn.innerHTML = originalText;
+      downloadBtn.disabled = false;
     }
+    return;
+  }
 
-    slide.addShape(pres.ShapeType.rect, {
-      x: 0, y: 0, w: '100%', h: '100%',
-      fill: { color: '000000', transparency: 70 }
-    });
-
-    // Map CSS flex to PPTX valign
-    let pptxValign = 'middle';
-    if (state.valign === 'flex-start') pptxValign = 'top';
-    if (state.valign === 'flex-end') pptxValign = 'bottom';
-
-    // Calculate approx Y based on offset
-    // 16x9 layout defaults to 10 width x 5.625 height in inches
-    // Let's adjust Y as a percentage of height or absolute
-    let baseY = 0;
-    if (pptxValign === 'top') baseY = 0.5;
-    else if (pptxValign === 'bottom') baseY = 4.5;
-    else baseY = 2.8; // middle approx
-
-    // rough px to inches conversion for offset (assume 72dpi -> 1px = ~0.0138 inches)
-    const offsetInches = state.offsetY * 0.0138;
-
-    slide.addText(slideObj.text, {
-      x: 0.5, 
-      y: (pptxValign === 'middle') ? '50%' : (baseY + offsetInches),
-      w: '90%', 
-      h: (pptxValign === 'middle') ? '90%' : 'auto',
-      align: 'center',
-      valign: pptxValign,
-      fontSize: parseInt(state.fontSize),
-      fontFace: state.fontFamily.replace(/'/g, '').split(',')[0],
-      color: 'FFFFFF',
-      breakLine: true,
-      fit: 'shrink' // This allows the text to automatically shrink to fit bounds!
-    });
-  });
+  // PDF or JPG Export
+  downloadBtn.innerText = "Capturando...";
+  downloadBtn.disabled = true;
 
   try {
-    await pres.writeFile({ fileName: 'Diapositivas_AutoRedactor.pptx' });
+    const originalIdx = state.currentSlideIdx;
+    const images = [];
+
+    // Temporarily remove any transitions to avoid capturing mid-animation
+    slidePreview.style.transition = "none";
+    slideContent.style.transition = "none";
+
+    for (let i = 0; i < state.slides.length; i++) {
+      state.currentSlideIdx = i;
+      updatePreview();
+      
+      // Wait a moment for DOM and styles to update perfectly
+      await new Promise(r => setTimeout(r, 150));
+
+      const canvas = await html2canvas(slidePreview, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: null
+      });
+      images.push({
+        dataUrl: canvas.toDataURL("image/jpeg", 0.95),
+        width: canvas.width,
+        height: canvas.height
+      });
+    }
+
+    // Restore the UI state to what it was
+    state.currentSlideIdx = originalIdx;
+    updatePreview();
+    slidePreview.style.transition = "";
+    slideContent.style.transition = "";
+
+    if (format === "pdf") {
+      downloadBtn.innerText = "Generando PDF...";
+      const { width, height } = images[0];
+      const pdf = new jsPDF({
+        orientation: width > height ? "landscape" : "portrait",
+        unit: "px",
+        format: [width, height]
+      });
+
+      images.forEach((img, idx) => {
+        if (idx > 0) pdf.addPage([img.width, img.height], img.width > img.height ? "landscape" : "portrait");
+        pdf.addImage(img.dataUrl, "JPEG", 0, 0, img.width, img.height);
+      });
+
+      pdf.save("Diapositivas_AutoRedactor.pdf");
+      
+    } else if (format === "jpg") {
+      downloadBtn.innerText = "Comprimiendo ZIP...";
+      const zip = new JSZip();
+      images.forEach((img, idx) => {
+        const base64Data = img.dataUrl.split(",")[1];
+        zip.file(`Diapositiva_${idx + 1}.jpg`, base64Data, { base64: true });
+      });
+      
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      saveAs(zipBlob, "Diapositivas_AutoRedactor_JPGs.zip");
+    }
   } catch (err) {
-    console.error("Error al exportar:", err);
-    alert("Ocurrió un error al exportar la presentación.");
+    console.error("Error capturando imágenes:", err);
+    alert("Hubo un error al generar las imágenes. Asegúrate de usar imágenes de fondo compatibles o subir una propia.");
+  } finally {
+    downloadBtn.innerHTML = originalText;
+    downloadBtn.disabled = false;
   }
 });
 

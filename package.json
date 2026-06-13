@@ -12,6 +12,10 @@
     "vite": "^8.0.12"
   },
   "dependencies": {
+    "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
     "pptxgenjs": "^4.0.1"
   }
 }
