@@ -1,0 +1,709 @@
+import { useState, useEffect, useRef } from 'react';
+import { SermonInputPanel } from './components/SermonInputPanel';
+import { SlidePreview } from './components/SlidePreview';
+import { EditorPanel } from './components/EditorPanel';
+import type { Slide, SlideStyle, ViewportMode, BibleData } from './types';
+import { toJpeg } from 'html-to-image';
+import { jsPDF } from 'jspdf';
+import pptxgen from 'pptxgenjs';
+import JSZip from 'jszip';
+import { Monitor, Tablet, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const KNOWN_VERSIONS = ['rvr1960', 'nvi', 'tla', 'ntv', 'lbla', 'dhh', 'nbla', 'rv1960', 'dhh94i', 'dhhs94'];
+
+const DEFAULT_GLOBAL_STYLE: SlideStyle = {
+  fontSize: 64,
+  lineHeight: 1.4,
+  color: '#ffffff',
+  fontFamily: "'Playfair Display', serif",
+  textAlign: 'center',
+  verticalAlign: 'center',
+  horizontalAlign: 'center',
+  textShadow: true,
+  textShadowColor: 'rgba(0, 0, 0, 0.75)',
+  textShadowBlur: 6,
+  backgroundType: 'gradient',
+  backgroundColor: '#1e1b4b',
+  backgroundGradient: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)',
+  backgroundImage: '',
+  overlayOpacity: 0.4,
+  overlayColor: '#000000',
+  padding: 8,
+  bold: false,
+  italic: false,
+  uppercase: false,
+  
+  // Reference
+  refColor: '#fde047', // Gold
+  refFontSize: 32,
+  refItalic: true,
+  refPosition: 'bottom',
+};
+
+const DEFAULT_SLIDES: Slide[] = [
+  {
+    id: 'welcome-slide-1',
+    text: 'Bienvenidos a la Casa de Dios\n\n"Yo me alegré con los que me decían:\nA la casa de Jehová iremos."',
+    reference: 'Salmos 122:1 (RVR1960)',
+    isVerse: true,
+  },
+  {
+    id: 'welcome-slide-2',
+    text: 'Busquen primeramente el reino de Dios y su justicia, y todas estas cosas les serán añadidas.',
+    reference: 'Mateo 6:33 (NVI)',
+    isVerse: true,
+  }
+];
+
+export default function App() {
+  const [sermonText, setSermonText] = useState<string>('');
+  const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
+  const [activeSlideId, setActiveSlideId] = useState<string | null>(DEFAULT_SLIDES[0].id);
+  const [globalStyle, setGlobalStyle] = useState<SlideStyle>(DEFAULT_GLOBAL_STYLE);
+  const [viewportMode, setViewportMode] = useState<ViewportMode>('desktop');
+  
+  // Bible database states
+  const [bibleVersion, setBibleVersion] = useState<'rvr1960' | 'nvi' | 'tla' | 'ntv' | 'lbla' | 'dhh' | 'nbla'>('rvr1960');
+  const [bibleData, setBibleData] = useState<BibleData | null>(null);
+  const [bibleLoading, setBibleLoading] = useState<boolean>(false);
+  const bibleCache = useRef<{ [key: string]: BibleData }>({});
+
+  // Export progress states
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportProgress, setExportProgress] = useState<string>('');
+  
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Dynamically fetch and cache Bible versions
+  const fetchBibleVersion = async (version: string): Promise<BibleData | null> => {
+    const normVersion = version.toLowerCase();
+    if (bibleCache.current[normVersion]) {
+      return bibleCache.current[normVersion];
+    }
+    try {
+      const response = await fetch(`/bibles/${normVersion}.json`);
+      if (response.ok) {
+        const data = await response.json();
+        bibleCache.current[normVersion] = data;
+        return data;
+      }
+    } catch (err) {
+      console.error(`Error loading Bible version ${normVersion}:`, err);
+    }
+    return null;
+  };
+
+  // Load Bible Data
+  useEffect(() => {
+    const loadBible = async () => {
+      if (bibleCache.current[bibleVersion]) {
+        setBibleData(bibleCache.current[bibleVersion]);
+        return;
+      }
+
+      setBibleLoading(true);
+      try {
+        const response = await fetch(`/bibles/${bibleVersion}.json`);
+        if (!response.ok) {
+          throw new Error('Failed to load Bible JSON');
+        }
+        const data = await response.json();
+        bibleCache.current[bibleVersion] = data;
+        setBibleData(data);
+      } catch (err) {
+        console.error('Error loading Bible:', err);
+      } finally {
+        setBibleLoading(false);
+      }
+    };
+
+    loadBible();
+  }, [bibleVersion]);
+
+  // Find currently active slide object
+  const activeSlideIndex = slides.findIndex(s => s.id === activeSlideId);
+  const activeSlide = activeSlideIndex !== -1 ? slides[activeSlideIndex] : null;
+
+  // Slide navigation helpers
+  const handlePrevSlide = () => {
+    if (activeSlideIndex > 0) {
+      setActiveSlideId(slides[activeSlideIndex - 1].id);
+    }
+  };
+
+  const handleNextSlide = () => {
+    if (activeSlideIndex < slides.length - 1) {
+      setActiveSlideId(slides[activeSlideIndex + 1].id);
+    }
+  };
+
+  // State handlers
+  const handleSelectSlide = (id: string) => {
+    setActiveSlideId(id);
+  };
+
+  const handleAddSlide = () => {
+    const newSlide: Slide = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: 'Nueva Diapositiva',
+      reference: '',
+      isVerse: false,
+    };
+    setSlides([...slides, newSlide]);
+    setActiveSlideId(newSlide.id);
+  };
+
+  const handleDeleteSlide = (id: string) => {
+    if (slides.length <= 1) {
+      alert("Debes tener al menos una diapositiva en tu presentación.");
+      return;
+    }
+    const filtered = slides.filter(s => s.id !== id);
+    setSlides(filtered);
+    if (activeSlideId === id) {
+      setActiveSlideId(filtered[0].id);
+    }
+  };
+
+  const handleReorderSlides = (index1: number, index2: number) => {
+    if (index1 < 0 || index1 >= slides.length || index2 < 0 || index2 >= slides.length) return;
+    const newSlides = [...slides];
+    const temp = newSlides[index1];
+    newSlides[index1] = newSlides[index2];
+    newSlides[index2] = temp;
+    setSlides(newSlides);
+  };
+
+  const handleChangeGlobalStyle = (newStyle: SlideStyle) => {
+    setGlobalStyle(newStyle);
+  };
+
+  const handleChangeSlideStyle = (newStyle: Partial<SlideStyle> | undefined) => {
+    if (!activeSlideId) return;
+    setSlides(slides.map(s => {
+      if (s.id === activeSlideId) {
+        if (newStyle === undefined) {
+          // Remove custom overrides
+          const { customStyle, ...rest } = s;
+          return rest;
+        } else {
+          return {
+            ...s,
+            customStyle: {
+              ...(s.customStyle || {}),
+              ...newStyle
+            }
+          };
+        }
+      }
+      return s;
+    }));
+  };
+
+  const handleApplyStyleToAll = () => {
+    if (!activeSlide || !activeSlide.customStyle) return;
+    if (window.confirm("¿Quieres aplicar este estilo a todas las diapositivas y borrar sus estilos personalizados?")) {
+      const mergedStyle = { ...globalStyle, ...activeSlide.customStyle };
+      setGlobalStyle(mergedStyle);
+      // Remove all slide specific custom overrides
+      setSlides(slides.map(s => {
+        const { customStyle, ...rest } = s;
+        return rest;
+      }));
+    }
+  };
+
+  const handleAddVerseToSlides = (text: string, reference: string) => {
+    const newSlide: Slide = {
+      id: Math.random().toString(36).substr(2, 9),
+      text,
+      reference,
+      isVerse: true,
+    };
+    setSlides([...slides, newSlide]);
+    setActiveSlideId(newSlide.id);
+  };
+
+  // Clear sermon and all slides
+  const handleClearAll = () => {
+    if (window.confirm("¿Seguro que deseas limpiar la prédica y borrar todas las diapositivas creadas?")) {
+      setSermonText('');
+      const firstSlide: Slide = {
+        id: Math.random().toString(36).substr(2, 9),
+        text: 'Nueva Diapositiva',
+        reference: '',
+        isVerse: false,
+      };
+      setSlides([firstSlide]);
+      setActiveSlideId(firstSlide.id);
+    }
+  };
+
+  // Generate slides by parsing sermon text
+  const handleGenerateSlides = async () => {
+    if (!sermonText.trim()) return;
+
+    if (slides.length > 0 && !window.confirm("¿Estás seguro de que quieres generar nuevas diapositivas? Esto reemplazará todas las diapositivas actuales.")) {
+      return;
+    }
+
+    setExportProgress('Procesando bosquejo de prédica y versículos...');
+    setIsExporting(true);
+
+    try {
+      // Split by double line break or manual page break '---'
+      const rawSegments = sermonText.split(/---|\n\s*\n/);
+      const parsedSlides: Slide[] = [];
+
+      // Regex to detect Spanish bible references: (1? \s* [letras]) [cap]:[vers] (optional [version])
+      // E.g. "Génesis 1:1", "1 Corintios 13:4-8", "Juan 3:16 TLA", "Hechos 2:1 (NVI)"
+      const refRegex = /((?:[1-3]\s+)?[a-zA-ZáéíóúÁÉÍÓÚñÑ]+)\s+(\d+):(\d+)(?:-(\d+))?(?:\s*(?:["'(\[]\s*)?([a-zA-Z0-9]+)(?:\s*["')\]])?)?/i;
+
+      for (const segment of rawSegments) {
+        const trimmed = segment.trim();
+        if (!trimmed) continue;
+
+        const match = trimmed.match(refRegex);
+        if (match) {
+          const bookName = match[1].trim();
+          const chapterNum = parseInt(match[2]);
+          const verseStart = parseInt(match[3]);
+          const verseEnd = match[4] ? parseInt(match[4]) : verseStart;
+          
+          let versionFound = '';
+          let fullMatchText = match[0];
+          
+          if (match[5]) {
+            const potentialVersion = match[5].toLowerCase();
+            if (KNOWN_VERSIONS.includes(potentialVersion)) {
+              versionFound = match[5].toUpperCase();
+              if (versionFound === 'RV1960') versionFound = 'RVR1960';
+            } else {
+              // Not a known version, contract match
+              const lastCoords = `${chapterNum}:${verseStart}` + (match[4] ? `-${verseEnd}` : '');
+              const lastIndex = trimmed.indexOf(lastCoords);
+              if (lastIndex !== -1) {
+                const endOfCoords = lastIndex + lastCoords.length;
+                fullMatchText = trimmed.substring(trimmed.indexOf(bookName), endOfCoords);
+              }
+            }
+          }
+
+          // Clean the slide text by removing the reference matched
+          let slideText = trimmed.replace(fullMatchText, '').trim();
+          slideText = slideText.replace(/^[:\s\-()[\]"']+|[:\s\-()[\]"']+$/g, '');
+
+          // Resolve which version to use
+          const finalVersion = versionFound ? versionFound.toLowerCase() : bibleVersion;
+          const bible = await fetchBibleVersion(finalVersion);
+
+          let fetchedText = '';
+          if (bible) {
+            const book = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+            if (book) {
+              const chapter = book.chapters[chapterNum - 1];
+              if (chapter && chapter.is_chapter) {
+                const versesSelected: string[] = [];
+                for (let v = verseStart; v <= verseEnd; v++) {
+                  const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(v));
+                  if (vItem) {
+                    versesSelected.push(vItem.lines.join(' '));
+                  }
+                }
+                fetchedText = versesSelected.join(' ');
+              }
+            }
+          }
+
+          // Segment was only the reference, so pull text from DB
+          if (!slideText && fetchedText) {
+            slideText = fetchedText;
+          }
+
+          parsedSlides.push({
+            id: Math.random().toString(36).substr(2, 9),
+            text: slideText || fetchedText || trimmed,
+            reference: `${bookName} ${chapterNum}:${verseStart}${verseEnd !== verseStart ? '-' + verseEnd : ''} (${finalVersion.toUpperCase()})`,
+            isVerse: true
+          });
+        } else {
+          // Standard slide segment
+          parsedSlides.push({
+            id: Math.random().toString(36).substr(2, 9),
+            text: trimmed,
+            reference: '',
+            isVerse: false
+          });
+        }
+      }
+
+      if (parsedSlides.length > 0) {
+        setSlides(parsedSlides);
+        setActiveSlideId(parsedSlides[0].id);
+      } else {
+        alert("No se pudo extraer ninguna diapositiva del texto.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Ocurrió un error al generar las diapositivas.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Helper function to build a full-size HTML node off-screen and return its JPEG base64 Data URL
+  const captureFullResolutionSlide = async (slide: Slide): Promise<string> => {
+    const dims = getViewportDimensions(viewportMode);
+    
+    // Merge global and slide-specific style
+    const style: SlideStyle = {
+      ...globalStyle,
+      ...(slide.customStyle || {}),
+    };
+
+    // Create sandbox container off-screen
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '-9999px';
+    container.style.width = `${dims.width}px`;
+    container.style.height = `${dims.height}px`;
+    document.body.appendChild(container);
+
+    const slideEl = document.createElement('div');
+    slideEl.style.width = '100%';
+    slideEl.style.height = '100%';
+    slideEl.style.display = 'flex';
+    slideEl.style.flexDirection = 'column';
+    slideEl.style.justifyContent = style.verticalAlign;
+    slideEl.style.alignItems = style.horizontalAlign;
+    slideEl.style.padding = `${style.padding}%`;
+    slideEl.style.boxSizing = 'border-box';
+    slideEl.style.position = 'relative';
+    slideEl.style.overflow = 'hidden';
+
+    // Apply Background
+    if (style.backgroundType === 'solid') {
+      slideEl.style.backgroundColor = style.backgroundColor;
+    } else if (style.backgroundType === 'gradient') {
+      slideEl.style.background = style.backgroundGradient;
+    } else if (style.backgroundType === 'image' && style.backgroundImage) {
+      slideEl.style.backgroundImage = `url(${style.backgroundImage})`;
+      slideEl.style.backgroundSize = 'cover';
+      slideEl.style.backgroundPosition = 'center';
+      slideEl.style.backgroundRepeat = 'no-repeat';
+    }
+
+    // Apply Overlay
+    if (style.backgroundType === 'image' && style.backgroundImage) {
+      const overlay = document.createElement('div');
+      overlay.style.position = 'absolute';
+      overlay.style.inset = '0';
+      overlay.style.backgroundColor = style.overlayColor;
+      overlay.style.opacity = String(style.overlayOpacity);
+      overlay.style.zIndex = '1';
+      slideEl.appendChild(overlay);
+    }
+
+    // Content wrapper
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'relative';
+    wrapper.style.zIndex = '2';
+    wrapper.style.width = '100%';
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '24px';
+    wrapper.style.textAlign = style.textAlign;
+
+    // Slide reference element
+    const refDiv = document.createElement('div');
+    refDiv.innerText = slide.reference;
+    refDiv.style.color = style.refColor;
+    refDiv.style.fontSize = `${style.refFontSize}px`;
+    refDiv.style.fontFamily = style.fontFamily;
+    refDiv.style.fontWeight = '600';
+    refDiv.style.fontStyle = style.refItalic ? 'italic' : 'normal';
+    refDiv.style.textTransform = 'uppercase';
+    refDiv.style.letterSpacing = '1px';
+    if (style.textShadow) {
+      refDiv.style.textShadow = '0 2px 4px rgba(0,0,0,0.5)';
+    }
+
+    // Slide text element
+    const textDiv = document.createElement('div');
+    textDiv.innerText = slide.text;
+    textDiv.style.color = style.color;
+    textDiv.style.fontSize = `${style.fontSize}px`;
+    textDiv.style.lineHeight = String(style.lineHeight);
+    textDiv.style.fontFamily = style.fontFamily;
+    textDiv.style.fontWeight = style.bold ? '700' : '400';
+    textDiv.style.fontStyle = style.italic ? 'italic' : 'normal';
+    textDiv.style.textTransform = style.uppercase ? 'uppercase' : 'none';
+    textDiv.style.whiteSpace = 'pre-wrap';
+    textDiv.style.wordBreak = 'break-word';
+    if (style.textShadow) {
+      textDiv.style.textShadow = `0 ${style.textShadowBlur}px ${style.textShadowBlur * 2}px ${style.textShadowColor}`;
+    }
+
+    // Order elements
+    if (slide.reference) {
+      if (style.refPosition === 'top') {
+        wrapper.appendChild(refDiv);
+        wrapper.appendChild(textDiv);
+      } else {
+        wrapper.appendChild(textDiv);
+        wrapper.appendChild(refDiv);
+      }
+    } else {
+      wrapper.appendChild(textDiv);
+    }
+
+    slideEl.appendChild(wrapper);
+    container.appendChild(slideEl);
+
+    // Wait a brief tick for render
+    await new Promise(resolve => setTimeout(resolve, 30));
+
+    try {
+      const dataUrl = await toJpeg(slideEl, {
+        width: dims.width,
+        height: dims.height,
+        quality: 0.95,
+      });
+      document.body.removeChild(container);
+      return dataUrl;
+    } catch (err) {
+      document.body.removeChild(container);
+      throw err;
+    }
+  };
+
+  // EXPORTS IMPLEMENTATION
+  
+  // 1. Export Current Slide to JPG
+  const handleExportCurrentJpg = async () => {
+    if (!activeSlide) return;
+    setIsExporting(true);
+    setExportProgress('Generando imagen JPG...');
+    try {
+      const dataUrl = await captureFullResolutionSlide(activeSlide);
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `diapositiva_${activeSlideIndex + 1}.jpg`;
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert('Error al exportar la imagen.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // 2. Export All Slides to ZIP
+  const handleExportAllJpg = async () => {
+    setIsExporting(true);
+    const zip = new JSZip();
+    try {
+      for (let i = 0; i < slides.length; i++) {
+        setExportProgress(`Capturando diapositiva ${i + 1} de ${slides.length}...`);
+        const dataUrl = await captureFullResolutionSlide(slides[i]);
+        // Extract base64 clean string
+        const base64Data = dataUrl.split(',')[1];
+        zip.file(`diapositiva_${i + 1}.jpg`, base64Data, { base64: true });
+      }
+      setExportProgress('Comprimiendo archivo ZIP...');
+      const content = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      link.download = `diapositivas_predica.zip`;
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert('Error al generar el archivo ZIP.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // 3. Export to PDF (Multi-page Landscape)
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const dims = getViewportDimensions(viewportMode);
+      const orientation = dims.width > dims.height ? 'l' : 'p';
+      const pdf = new jsPDF({
+        orientation: orientation,
+        unit: 'px',
+        format: [dims.width, dims.height]
+      });
+
+      for (let i = 0; i < slides.length; i++) {
+        setExportProgress(`Renderizando PDF: página ${i + 1} de ${slides.length}...`);
+        const dataUrl = await captureFullResolutionSlide(slides[i]);
+        
+        if (i > 0) {
+          pdf.addPage([dims.width, dims.height], orientation);
+        }
+        
+        pdf.addImage(dataUrl, 'JPEG', 0, 0, dims.width, dims.height);
+      }
+
+      setExportProgress('Guardando documento PDF...');
+      pdf.save(`presentacion_predica.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert('Error al generar el PDF.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // 4. Export to PPTX (Native Slides carrying captured full-res images)
+  const handleExportPptx = async () => {
+    setIsExporting(true);
+    try {
+      const pptx = new pptxgen();
+      
+      // Configure aspect ratio
+      if (viewportMode === 'mobile') {
+        pptx.defineLayout({ name: 'MOBILE', width: 5.625, height: 10.0 });
+        pptx.layout = 'MOBILE';
+      } else if (viewportMode === 'tablet') {
+        pptx.layout = 'LAYOUT_4x3';
+      } else {
+        pptx.layout = 'LAYOUT_16x9';
+      }
+
+      for (let i = 0; i < slides.length; i++) {
+        setExportProgress(`Preparando PPTX: diapositiva ${i + 1} de ${slides.length}...`);
+        const dataUrl = await captureFullResolutionSlide(slides[i]);
+        
+        const pptxSlide = pptx.addSlide();
+        pptxSlide.addImage({
+          data: dataUrl,
+          x: 0,
+          y: 0,
+          w: '100%',
+          h: '100%'
+        });
+      }
+
+      setExportProgress('Generando archivo PowerPoint...');
+      await pptx.writeFile({ fileName: `presentacion_predica.pptx` });
+    } catch (err) {
+      console.error(err);
+      alert('Error al generar la presentación de PowerPoint.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const getViewportDimensions = (mode: ViewportMode) => {
+    switch (mode) {
+      case 'desktop':
+        return { width: 1920, height: 1080, scale: 0.5 };
+      case 'tablet':
+        return { width: 1024, height: 768, scale: 0.703125 };
+      case 'mobile':
+        return { width: 1080, height: 1920, scale: 0.28125 };
+    }
+  };
+
+  return (
+    <div className="app-container">
+      {/* Left panel: Inputs, Bible searches, and Slides thumbnails list */}
+      <SermonInputPanel
+        sermonText={sermonText}
+        onChangeSermonText={setSermonText}
+        slides={slides}
+        activeSlideId={activeSlideId}
+        onSelectSlide={handleSelectSlide}
+        onAddSlide={handleAddSlide}
+        onDeleteSlide={handleDeleteSlide}
+        onReorderSlides={handleReorderSlides}
+        onGenerateSlides={handleGenerateSlides}
+        onClearAll={handleClearAll}
+        bibleVersion={bibleVersion}
+        onChangeBibleVersion={setBibleVersion}
+        bibleData={bibleData}
+        bibleLoading={bibleLoading}
+        onAddVerseToSlides={handleAddVerseToSlides}
+      />
+
+      {/* Central panel: Viewport control and Slide render canvas */}
+      <div className="workspace">
+        <div className="control-bar">
+          <div className="viewport-selectors">
+            <button 
+              className={`viewport-btn ${viewportMode === 'desktop' ? 'active' : ''}`}
+              onClick={() => setViewportMode('desktop')}
+            >
+              <Monitor size={14} />
+              Desktop 16:9
+            </button>
+            <button 
+              className={`viewport-btn ${viewportMode === 'tablet' ? 'active' : ''}`}
+              onClick={() => setViewportMode('tablet')}
+            >
+              <Tablet size={14} />
+              Tableta 4:3
+            </button>
+            <button 
+              className={`viewport-btn ${viewportMode === 'mobile' ? 'active' : ''}`}
+              onClick={() => setViewportMode('mobile')}
+            >
+              <Smartphone size={14} />
+              Móvil 9:16
+            </button>
+          </div>
+
+          {/* Quick Slide Navigation */}
+          {slides.length > 0 && (
+            <div className="slide-number-nav">
+              <button 
+                className="slide-nav-btn"
+                onClick={handlePrevSlide}
+                disabled={activeSlideIndex <= 0}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="slide-nav-indicator">
+                {activeSlideIndex !== -1 ? activeSlideIndex + 1 : 0} / {slides.length}
+              </span>
+              <button 
+                className="slide-nav-btn"
+                onClick={handleNextSlide}
+                disabled={activeSlideIndex >= slides.length - 1}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Live Preview Canvas */}
+        <SlidePreview
+          slide={activeSlide}
+          globalStyle={globalStyle}
+          viewportMode={viewportMode}
+          canvasRef={canvasRef}
+        />
+      </div>
+
+      {/* Right panel: Typography, alignment, colors, backgrounds, export operations */}
+      <EditorPanel
+        activeSlide={activeSlide}
+        globalStyle={globalStyle}
+        onChangeGlobalStyle={handleChangeGlobalStyle}
+        onChangeSlideStyle={handleChangeSlideStyle}
+        onApplyStyleToAll={handleApplyStyleToAll}
+        onExportCurrentJpg={handleExportCurrentJpg}
+        onExportAllJpg={handleExportAllJpg}
+        onExportPdf={handleExportPdf}
+        onExportPptx={handleExportPptx}
+        isExporting={isExporting}
+        exportProgress={exportProgress}
+      />
+    </div>
+  );
+}
