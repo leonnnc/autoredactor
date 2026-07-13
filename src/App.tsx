@@ -28,7 +28,7 @@ const DEFAULT_GLOBAL_STYLE: SlideStyle = {
   backgroundImage: '',
   overlayOpacity: 0.4,
   overlayColor: '#000000',
-  paddingX: 10,
+  paddingX: 24,
   paddingY: 8,
   bold: false,
   italic: false,
