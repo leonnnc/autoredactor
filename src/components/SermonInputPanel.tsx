@@ -116,9 +116,10 @@ export const SermonInputPanel: React.FC<SermonInputPanelProps> = ({
           for (const item of ch.items) {
             if (item.type !== 'verse') continue;
             
-            const verseText = item.lines.join(' ');
+            const verseNumbersStr = item.verse_numbers.join('-');
+            const verseText = `${verseNumbersStr} ${item.lines.join(' ')}`;
             if (verseText.toLowerCase().includes(query)) {
-              const ref = `${book.name} ${chNum}:${item.verse_numbers.join('-')}`;
+              const ref = `${book.name} ${chNum}:${verseNumbersStr}`;
               results.push({ reference: ref, text: verseText });
               
               if (results.length >= 60) break; // Limit search results to avoid DOM bloat
@@ -144,7 +145,7 @@ export const SermonInputPanel: React.FC<SermonInputPanelProps> = ({
     for (let v = start; v <= end; v++) {
       const match = versesInChapter.find(item => item.verse_numbers.includes(v));
       if (match) {
-        const text = match.lines.join(' ');
+        const text = `${v} ${match.lines.join(' ')}`;
         const reference = `${currentBook.name} ${selectedChapterIndex + 1}:${v} (${bibleVersion.toUpperCase()})`;
         onAddVerseToSlides(text, reference);
       }

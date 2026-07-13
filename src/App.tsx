@@ -79,7 +79,7 @@ const splitCustomTextByVerses = (text: string, start: number, end: number): stri
       const current = splitIndices[i];
       const next = splitIndices[i + 1];
       
-      const textStart = current.index + String(current.verse).length;
+      const textStart = current.index;
       const textEnd = next ? next.index : currentText.length;
       
       let verseText = currentText.substring(textStart, textEnd).trim();
@@ -589,7 +589,7 @@ export default function App() {
                 if (chapter) {
                   const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(v));
                   if (vItem) {
-                    verseText = vItem.lines.join(' ');
+                    verseText = `${v} ${vItem.lines.join(' ')}`;
                   }
                 }
               }
@@ -636,7 +636,7 @@ export default function App() {
               if (chapter) {
                 const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(verseStart));
                 if (vItem) {
-                  fetchedText = vItem.lines.join(' ');
+                  fetchedText = `${verseStart} ${vItem.lines.join(' ')}`;
                 }
               }
             }
