@@ -270,40 +270,49 @@ export const SermonInputPanel: React.FC<SermonInputPanelProps> = ({
                     ))}
                   </select>
 
-                  {/* Chapter and Verses Row */}
+                   {/* Chapter and Verses Row with labels */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                    <select
-                      className="form-select"
-                      value={selectedChapterIndex}
-                      onChange={(e) => setSelectedChapterIndex(parseInt(e.target.value))}
-                      title="Capítulo"
-                    >
-                      {Array.from({ length: totalChapters }).map((_, idx) => (
-                        <option key={idx} value={idx}>Cap. {idx + 1}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Capítulo</span>
+                      <select
+                        className="form-select"
+                        value={selectedChapterIndex}
+                        onChange={(e) => setSelectedChapterIndex(parseInt(e.target.value))}
+                        title="Capítulo"
+                      >
+                        {Array.from({ length: totalChapters }).map((_, idx) => (
+                          <option key={idx} value={idx}>Cap. {idx + 1}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                    <select
-                      className="form-select"
-                      value={selectedVerseStart}
-                      onChange={(e) => setSelectedVerseStart(parseInt(e.target.value))}
-                      title="Versículo Desde"
-                    >
-                      {Array.from({ length: totalVerses }).map((_, idx) => (
-                        <option key={idx} value={idx + 1}>Ver. {idx + 1}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Desde (Ver.)</span>
+                      <select
+                        className="form-select"
+                        value={selectedVerseStart}
+                        onChange={(e) => setSelectedVerseStart(parseInt(e.target.value))}
+                        title="Versículo Desde"
+                      >
+                        {Array.from({ length: totalVerses }).map((_, idx) => (
+                          <option key={idx} value={idx + 1}>Ver. {idx + 1}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                    <select
-                      className="form-select"
-                      value={selectedVerseEnd}
-                      onChange={(e) => setSelectedVerseEnd(parseInt(e.target.value))}
-                      title="Versículo Hasta"
-                    >
-                      {Array.from({ length: totalVerses }).map((_, idx) => (
-                        <option key={idx} value={idx + 1}>Ver. {idx + 1}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Hasta (Ver.)</span>
+                      <select
+                        className="form-select"
+                        value={selectedVerseEnd}
+                        onChange={(e) => setSelectedVerseEnd(parseInt(e.target.value))}
+                        title="Versículo Hasta"
+                      >
+                        {Array.from({ length: totalVerses }).map((_, idx) => (
+                          <option key={idx} value={idx + 1}>Ver. {idx + 1}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   
                   <button 
