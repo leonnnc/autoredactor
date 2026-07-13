@@ -50,6 +50,44 @@ const DEFAULT_SLIDES: Slide[] = [
   }
 ];
 
+const splitCustomTextByVerses = (text: string, start: number, end: number): string[] => {
+  const results: string[] = [];
+  const currentText = text.trim();
+  
+  // Find the index of each verse number in the text
+  const splitIndices: { verse: number; index: number }[] = [];
+  for (let v = start; v <= end; v++) {
+    // Match the number as a standalone token
+    const regex = new RegExp(`(?:^|\\s)(${v})(?:\\s|\\u00a0|\\.|\\:)`, 'm');
+    const match = currentText.match(regex);
+    if (match && match.index !== undefined) {
+      // Find where the verse number starts inside the match
+      const numIndex = match.index + match[0].indexOf(String(v));
+      splitIndices.push({ verse: v, index: numIndex });
+    }
+  }
+
+  if (splitIndices.length > 0) {
+    // Sort splits in order of index
+    splitIndices.sort((a, b) => a.index - b.index);
+
+    for (let i = 0; i < splitIndices.length; i++) {
+      const current = splitIndices[i];
+      const next = splitIndices[i + 1];
+      
+      const textStart = current.index + String(current.verse).length;
+      const textEnd = next ? next.index : currentText.length;
+      
+      let verseText = currentText.substring(textStart, textEnd).trim();
+      // Remove leading dots, hyphens, colons, spaces, quotes
+      verseText = verseText.replace(/^[:\s\-()[\]"'.]+/g, '');
+      results.push(verseText);
+    }
+  }
+  
+  return results;
+};
+
 export default function App() {
   const [sermonText, setSermonText] = useState<string>('');
   const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
@@ -215,7 +253,7 @@ export default function App() {
       reference,
       isVerse: true,
     };
-    setSlides([...slides, newSlide]);
+    setSlides(prev => [...prev, newSlide]);
     setActiveSlideId(newSlide.id);
   };
 
@@ -237,8 +275,6 @@ export default function App() {
   // Generate slides by parsing sermon text
   const handleGenerateSlides = async () => {
     if (!sermonText.trim()) return;
-
-
 
     setExportProgress('Procesando bosquejo de prédica y versículos...');
     setIsExporting(true);
@@ -290,35 +326,66 @@ export default function App() {
           const finalVersion = versionFound ? versionFound.toLowerCase() : bibleVersion;
           const bible = await fetchBibleVersion(finalVersion);
 
-          let fetchedText = '';
-          if (bible) {
-            const book = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
-            if (book) {
-              const chapter = book.chapters[chapterNum - 1];
-              if (chapter && chapter.is_chapter) {
-                const versesSelected: string[] = [];
-                for (let v = verseStart; v <= verseEnd; v++) {
-                  const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(v));
-                  if (vItem) {
-                    versesSelected.push(vItem.lines.join(' '));
+          // If it's a range of multiple verses, split them!
+          if (verseStart !== verseEnd) {
+            let customSplitTexts: string[] = [];
+            if (slideText) {
+              customSplitTexts = splitCustomTextByVerses(slideText, verseStart, verseEnd);
+            }
+
+            for (let v = verseStart; v <= verseEnd; v++) {
+              let verseText = '';
+              const customIdx = v - verseStart;
+              
+              if (customSplitTexts.length > customIdx && customSplitTexts[customIdx]) {
+                verseText = customSplitTexts[customIdx];
+              } else if (bible) {
+                const book = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+                if (book) {
+                  const chapter = book.chapters[chapterNum - 1];
+                  if (chapter && chapter.is_chapter) {
+                    const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(v));
+                    if (vItem) {
+                      verseText = vItem.lines.join(' ');
+                    }
                   }
                 }
-                fetchedText = versesSelected.join(' ');
+              }
+
+              if (!verseText) {
+                verseText = slideText || `Versículo ${v}`;
+              }
+
+              parsedSlides.push({
+                id: Math.random().toString(36).substr(2, 9),
+                text: verseText,
+                reference: `${bookName} ${chapterNum}:${v} (${finalVersion.toUpperCase()})`,
+                isVerse: true
+              });
+            }
+          } else {
+            // Single verse
+            let fetchedText = '';
+            if (!slideText && bible) {
+              const book = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+              if (book) {
+                const chapter = book.chapters[chapterNum - 1];
+                if (chapter && chapter.is_chapter) {
+                  const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(verseStart));
+                  if (vItem) {
+                    fetchedText = vItem.lines.join(' ');
+                  }
+                }
               }
             }
-          }
 
-          // Segment was only the reference, so pull text from DB
-          if (!slideText && fetchedText) {
-            slideText = fetchedText;
+            parsedSlides.push({
+              id: Math.random().toString(36).substr(2, 9),
+              text: slideText || fetchedText || trimmed,
+              reference: `${bookName} ${chapterNum}:${verseStart} (${finalVersion.toUpperCase()})`,
+              isVerse: true
+            });
           }
-
-          parsedSlides.push({
-            id: Math.random().toString(36).substr(2, 9),
-            text: slideText || fetchedText || trimmed,
-            reference: `${bookName} ${chapterNum}:${verseStart}${verseEnd !== verseStart ? '-' + verseEnd : ''} (${finalVersion.toUpperCase()})`,
-            isVerse: true
-          });
         } else {
           // Standard slide segment
           parsedSlides.push({

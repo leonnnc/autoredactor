@@ -141,22 +141,13 @@ export const SermonInputPanel: React.FC<SermonInputPanelProps> = ({
     const start = Math.min(selectedVerseStart, selectedVerseEnd);
     const end = Math.max(selectedVerseStart, selectedVerseEnd);
     
-    let combinedText = '';
-    const versesSelected: number[] = [];
-    
-    // Find lines matching selected verse range
     for (let v = start; v <= end; v++) {
       const match = versesInChapter.find(item => item.verse_numbers.includes(v));
       if (match) {
-        combinedText += (combinedText ? ' ' : '') + match.lines.join(' ');
-        versesSelected.push(v);
+        const text = match.lines.join(' ');
+        const reference = `${currentBook.name} ${selectedChapterIndex + 1}:${v} (${bibleVersion.toUpperCase()})`;
+        onAddVerseToSlides(text, reference);
       }
-    }
-    
-    if (combinedText) {
-      const rangeStr = start === end ? `${start}` : `${start}-${end}`;
-      const reference = `${currentBook.name} ${selectedChapterIndex + 1}:${rangeStr} (${bibleVersion.toUpperCase()})`;
-      onAddVerseToSlides(combinedText, reference);
     }
   };
 
