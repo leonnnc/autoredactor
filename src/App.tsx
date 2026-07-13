@@ -47,7 +47,6 @@ const DEFAULT_SLIDES: Slide[] = [
     text: 'Nueva Diapositiva',
     reference: '',
     isVerse: false,
-    customStyle: { paddingX: 10 }
   }
 ];
 
@@ -302,7 +301,6 @@ export default function App() {
       text: 'Nueva Diapositiva',
       reference: '',
       isVerse: false,
-      customStyle: { paddingX: 10 }
     };
     setSlides([...slides, newSlide]);
     setActiveSlideId(newSlide.id);
@@ -374,7 +372,6 @@ export default function App() {
       text,
       reference,
       isVerse: true,
-      customStyle: { paddingX: 18 }
     };
     setSlides(prev => [...prev, newSlide]);
     setActiveSlideId(newSlide.id);
@@ -389,7 +386,6 @@ export default function App() {
         text: 'Nueva Diapositiva',
         reference: '',
         isVerse: false,
-        customStyle: { paddingX: 10 }
       };
       setSlides([firstSlide]);
       setActiveSlideId(firstSlide.id);
@@ -624,8 +620,7 @@ export default function App() {
                   id: Math.random().toString(36).substr(2, 9),
                   text: chunk,
                   reference: `${bookName} ${chapterNum}:${verseStart}-${verseEnd} (${finalVersion.toUpperCase()})`,
-                  isVerse: true,
-                  customStyle: { paddingX: 18 }
+                  isVerse: true
                 });
               }
             } else {
@@ -636,8 +631,7 @@ export default function App() {
                     id: Math.random().toString(36).substr(2, 9),
                     text: chunk,
                     reference: `${bookName} ${chapterNum}:${rv.num} (${finalVersion.toUpperCase()})`,
-                    isVerse: true,
-                    customStyle: { paddingX: 18 }
+                    isVerse: true
                   });
                 }
               }
@@ -672,8 +666,7 @@ export default function App() {
                 id: Math.random().toString(36).substr(2, 9),
                 text: chunk,
                 reference: `${bookName} ${chapterNum}:${verseStart} (${finalVersion.toUpperCase()})`,
-                isVerse: true,
-                customStyle: { paddingX: 18 }
+                isVerse: true
               });
             }
           }
@@ -685,8 +678,7 @@ export default function App() {
               id: Math.random().toString(36).substr(2, 9),
               text: chunk,
               reference: '',
-              isVerse: false,
-              customStyle: { paddingX: 10 }
+              isVerse: false
             });
           }
         }
@@ -720,6 +712,14 @@ export default function App() {
       ...globalStyle,
       ...(slide.customStyle || {}),
     };
+
+    if (slide.customStyle && slide.customStyle.paddingX !== undefined) {
+      style.paddingX = slide.customStyle.paddingX;
+    } else if (globalStyle.paddingX === 15) {
+      style.paddingX = slide.isVerse ? 18 : 10;
+    } else {
+      style.paddingX = globalStyle.paddingX;
+    }
 
     // Create sandbox container off-screen
     const container = document.createElement('div');

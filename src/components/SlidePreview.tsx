@@ -41,6 +41,14 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
     ...(slide.customStyle || {}),
   };
 
+  if (slide.customStyle && slide.customStyle.paddingX !== undefined) {
+    style.paddingX = slide.customStyle.paddingX;
+  } else if (globalStyle.paddingX === 15) {
+    style.paddingX = slide.isVerse ? 18 : 10;
+  } else {
+    style.paddingX = globalStyle.paddingX;
+  }
+
   const dimensions = getViewportDimensions(viewportMode);
   
   // Outer wrapper container size
