@@ -88,6 +88,46 @@ const splitCustomTextByVerses = (text: string, start: number, end: number): stri
   return results;
 };
 
+const splitLongTextIntoChunks = (text: string, maxLength = 280): string[] => {
+  if (text.length <= maxLength) return [text];
+  
+  // Split by sentence endings: . ? !
+  const sentences = text.match(/[^.!?]+[.!?]+(?:\s|$)/g) || [text];
+  const chunks: string[] = [];
+  let currentChunk = '';
+  
+  for (const sentence of sentences) {
+    const trimmedSentence = sentence.trim();
+    if (!trimmedSentence) continue;
+    
+    if ((currentChunk + ' ' + trimmedSentence).trim().length <= maxLength) {
+      currentChunk = (currentChunk + ' ' + trimmedSentence).trim();
+    } else {
+      if (currentChunk) chunks.push(currentChunk);
+      
+      // If a single sentence is longer than maxLength, split by words
+      if (trimmedSentence.length > maxLength) {
+        const words = trimmedSentence.split(/\s+/);
+        let temp = '';
+        for (const word of words) {
+          if ((temp + ' ' + word).trim().length <= maxLength) {
+            temp = (temp + ' ' + word).trim();
+          } else {
+            if (temp) chunks.push(temp);
+            temp = word;
+          }
+        }
+        currentChunk = temp;
+      } else {
+        currentChunk = trimmedSentence;
+      }
+    }
+  }
+  
+  if (currentChunk) chunks.push(currentChunk);
+  return chunks;
+};
+
 export default function App() {
   const [sermonText, setSermonText] = useState<string>('');
   const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
@@ -326,13 +366,14 @@ export default function App() {
           const finalVersion = versionFound ? versionFound.toLowerCase() : bibleVersion;
           const bible = await fetchBibleVersion(finalVersion);
 
-          // If it's a range of multiple verses, split them!
+          // If it's a range of multiple verses
           if (verseStart !== verseEnd) {
             let customSplitTexts: string[] = [];
             if (slideText) {
               customSplitTexts = splitCustomTextByVerses(slideText, verseStart, verseEnd);
             }
 
+            const rangeVerses: { text: string; num: number }[] = [];
             for (let v = verseStart; v <= verseEnd; v++) {
               let verseText = '';
               const customIdx = v - verseStart;
@@ -355,13 +396,39 @@ export default function App() {
               if (!verseText) {
                 verseText = slideText || `Versículo ${v}`;
               }
+              
+              rangeVerses.push({ text: verseText, num: v });
+            }
 
-              parsedSlides.push({
-                id: Math.random().toString(36).substr(2, 9),
-                text: verseText,
-                reference: `${bookName} ${chapterNum}:${v} (${finalVersion.toUpperCase()})`,
-                isVerse: true
-              });
+            const combinedText = rangeVerses.map(rv => rv.text).join(' ');
+            const totalLength = combinedText.length;
+
+            if (totalLength <= 260) {
+              // Short enough to fit on a single slide.
+              // Apply chunking just in case it is still slightly long
+              const chunks = splitLongTextIntoChunks(combinedText, 280);
+              for (const chunk of chunks) {
+                parsedSlides.push({
+                  id: Math.random().toString(36).substr(2, 9),
+                  text: chunk,
+                  reference: `${bookName} ${chapterNum}:${verseStart}-${verseEnd} (${finalVersion.toUpperCase()})`,
+                  isVerse: true
+                });
+              }
+            } else {
+              // Too long, create a slide for each verse.
+              // If a single verse is still too long, chunk it as well!
+              for (const rv of rangeVerses) {
+                const chunks = splitLongTextIntoChunks(rv.text, 280);
+                for (const chunk of chunks) {
+                  parsedSlides.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    text: chunk,
+                    reference: `${bookName} ${chapterNum}:${rv.num} (${finalVersion.toUpperCase()})`,
+                    isVerse: true
+                  });
+                }
+              }
             }
           } else {
             // Single verse
@@ -379,21 +446,28 @@ export default function App() {
               }
             }
 
-            parsedSlides.push({
-              id: Math.random().toString(36).substr(2, 9),
-              text: slideText || fetchedText || trimmed,
-              reference: `${bookName} ${chapterNum}:${verseStart} (${finalVersion.toUpperCase()})`,
-              isVerse: true
-            });
+            const targetText = slideText || fetchedText || trimmed;
+            const chunks = splitLongTextIntoChunks(targetText, 280);
+            for (const chunk of chunks) {
+              parsedSlides.push({
+                id: Math.random().toString(36).substr(2, 9),
+                text: chunk,
+                reference: `${bookName} ${chapterNum}:${verseStart} (${finalVersion.toUpperCase()})`,
+                isVerse: true
+              });
+            }
           }
         } else {
-          // Standard slide segment
-          parsedSlides.push({
-            id: Math.random().toString(36).substr(2, 9),
-            text: trimmed,
-            reference: '',
-            isVerse: false
-          });
+          // Standard slide segment (chunk it if it is a very long paragraph)
+          const chunks = splitLongTextIntoChunks(trimmed, 280);
+          for (const chunk of chunks) {
+            parsedSlides.push({
+              id: Math.random().toString(36).substr(2, 9),
+              text: chunk,
+              reference: '',
+              isVerse: false
+            });
+          }
         }
       }
 
