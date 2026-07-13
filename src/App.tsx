@@ -238,9 +238,7 @@ export default function App() {
   const handleGenerateSlides = async () => {
     if (!sermonText.trim()) return;
 
-    if (slides.length > 0 && !window.confirm("¿Estás seguro de que quieres generar nuevas diapositivas? Esto reemplazará todas las diapositivas actuales.")) {
-      return;
-    }
+
 
     setExportProgress('Procesando bosquejo de prédica y versículos...');
     setIsExporting(true);
