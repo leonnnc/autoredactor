@@ -7,7 +7,7 @@ import { toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import JSZip from 'jszip';
-import { Monitor, Tablet, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Monitor, Tablet, Smartphone, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 const KNOWN_VERSIONS = ['rvr1960', 'nvi', 'tla', 'ntv', 'lbla', 'dhh', 'nbla', 'rv1960', 'dhh94i', 'dhhs94'];
 
@@ -131,12 +131,89 @@ const splitLongTextIntoChunks = (text: string, maxLength = 280): string[] => {
   return chunks;
 };
 
+const levenshteinDistance = (a: string, b: string): number => {
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1, // deletion
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j - 1] + 1 // substitution
+        );
+      }
+    }
+  }
+  return matrix[a.length][b.length];
+};
+
+const findClosestBookName = (name: string, list: string[]): string | null => {
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const nName = norm(name);
+  
+  let bestMatch: string | null = null;
+  let bestScore = 999;
+  
+  for (const item of list) {
+    const nItem = norm(item);
+    if (nItem === nName) return item;
+    if (nItem.includes(nName) || nName.includes(nItem)) {
+      return item;
+    }
+    
+    const score = levenshteinDistance(nName, nItem);
+    if (score < 4 && score < bestScore) {
+      bestScore = score;
+      bestMatch = item;
+    }
+  }
+  
+  return bestMatch;
+};
+
+interface OperatorError {
+  title: string;
+  message: string;
+  options: {
+    label: string;
+    action: () => void;
+    variant?: 'primary' | 'secondary' | 'danger';
+  }[];
+}
+
 export default function App() {
   const [sermonText, setSermonText] = useState<string>('');
   const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
   const [activeSlideId, setActiveSlideId] = useState<string | null>(DEFAULT_SLIDES[0].id);
   const [globalStyle, setGlobalStyle] = useState<SlideStyle>(DEFAULT_GLOBAL_STYLE);
   const [viewportMode, setViewportMode] = useState<ViewportMode>('desktop');
+  const [operatorError, setOperatorError] = useState<OperatorError | null>(null);
+
+  const askOperator = (
+    title: string, 
+    message: string, 
+    options: { label: string; value: string; variant?: 'primary' | 'secondary' | 'danger' }[]
+  ): Promise<string> => {
+    return new Promise((resolve) => {
+      setOperatorError({
+        title,
+        message,
+        options: options.map(opt => ({
+          label: opt.label,
+          variant: opt.variant,
+          action: () => {
+            setOperatorError(null);
+            resolve(opt.value);
+          }
+        }))
+      });
+    });
+  };
   
   // Bible database states
   const [bibleVersion, setBibleVersion] = useState<'rvr1960' | 'nvi' | 'tla' | 'ntv' | 'lbla' | 'dhh' | 'nbla'>('rvr1960');
@@ -337,7 +414,7 @@ export default function App() {
 
         const match = trimmed.match(refRegex);
         if (match) {
-          const bookName = match[1].trim();
+          let bookName = match[1].trim();
           const chapterNum = parseInt(match[2]);
           const verseStart = parseInt(match[3]);
           const verseEnd = match[4] ? parseInt(match[4]) : verseStart;
@@ -369,6 +446,83 @@ export default function App() {
           const finalVersion = versionFound ? versionFound.toLowerCase() : bibleVersion;
           const bible = await fetchBibleVersion(finalVersion);
 
+          let useDb = true;
+          let matchedBook = null;
+
+          if (bible) {
+            matchedBook = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+            
+            // ERROR 1: Unrecognized Book Name
+            if (!matchedBook) {
+              const allBookNames = bible.books.map(b => b.name);
+              const suggestion = findClosestBookName(bookName, allBookNames);
+              
+              const choice = await askOperator(
+                "Libro No Reconocido ⚠️",
+                `El libro "${bookName}" no se encontró en la versión ${finalVersion.toUpperCase()}.\n${suggestion ? `¿Quisiste decir "${suggestion}"?` : 'Por favor verifica la ortografía.'}`,
+                [
+                  ...(suggestion ? [{ label: `Sí, corregir a "${suggestion}"`, value: 'use_suggestion', variant: 'primary' as const }] : []),
+                  { label: "Tratar como texto normal", value: 'text_fallback', variant: 'secondary' as const },
+                  { label: "Detener generación", value: 'abort', variant: 'danger' as const }
+                ]
+              );
+
+              if (choice === 'abort') {
+                throw new Error('Generación cancelada por el operador para corregir el texto.');
+              } else if (choice === 'use_suggestion' && suggestion) {
+                bookName = suggestion;
+                matchedBook = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+              } else {
+                useDb = false;
+              }
+            }
+
+            // ERROR 2: Chapter or Verse Out of Bounds
+            if (useDb && matchedBook) {
+              const chapter = matchedBook.chapters[chapterNum - 1];
+              if (!chapter || !chapter.is_chapter) {
+                const choice = await askOperator(
+                  "Capítulo Inexistente ⚠️",
+                  `El libro "${bookName}" solo tiene ${matchedBook.chapters.length} capítulos. Intentaste buscar el capítulo ${chapterNum}.\n¿Cómo deseas proceder?`,
+                  [
+                    { label: "Tratar como texto normal", value: 'text_fallback', variant: 'primary' as const },
+                    { label: "Detener generación", value: 'abort', variant: 'danger' as const }
+                  ]
+                );
+                if (choice === 'abort') {
+                  throw new Error('Generación cancelada para corregir el capítulo.');
+                } else {
+                  useDb = false;
+                }
+              } else {
+                // Check verse boundaries
+                const maxVerseInChapter = chapter.items.reduce((max, item) => {
+                  if (item.type === 'verse') {
+                    const itemMax = Math.max(...item.verse_numbers);
+                    return itemMax > max ? itemMax : max;
+                  }
+                  return max;
+                }, 0);
+
+                if (verseStart > maxVerseInChapter || verseEnd > maxVerseInChapter) {
+                  const choice = await askOperator(
+                    "Versículo Inexistente ⚠️",
+                    `El capítulo ${chapterNum} de "${bookName}" tiene ${maxVerseInChapter} versículos. Intentaste buscar el versículo ${verseStart > maxVerseInChapter ? verseStart : verseEnd}.\n¿Cómo deseas proceder?`,
+                    [
+                      { label: "Tratar como texto normal", value: 'text_fallback', variant: 'primary' as const },
+                      { label: "Detener generación", value: 'abort', variant: 'danger' as const }
+                    ]
+                  );
+                  if (choice === 'abort') {
+                    throw new Error('Generación cancelada para corregir el versículo.');
+                  } else {
+                    useDb = false;
+                  }
+                }
+              }
+            }
+          }
+
           // If it's a range of multiple verses
           if (verseStart !== verseEnd) {
             let customSplitTexts: string[] = [];
@@ -376,22 +530,43 @@ export default function App() {
               customSplitTexts = splitCustomTextByVerses(slideText, verseStart, verseEnd);
             }
 
+            // ERROR 3: Missing verses in pasted range
+            if (useDb && slideText && customSplitTexts.length < (verseEnd - verseStart + 1)) {
+              const expectedCount = verseEnd - verseStart + 1;
+              const choice = await askOperator(
+                "Versículos Faltantes en Texto Pegado ⚠️",
+                `Para el pasaje "${bookName} ${chapterNum}:${verseStart}-${verseEnd}", pegaste texto personalizado pero se detectaron ${customSplitTexts.length} versículos de los ${expectedCount} esperados.\n¿Cómo deseas proceder?`,
+                [
+                  { label: "Autocompletar faltantes de la Biblia", value: 'fill_missing', variant: 'primary' as const },
+                  { label: "Ignorar y usar solo mi texto", value: 'keep_custom', variant: 'secondary' as const },
+                  { label: "Detener generación", value: 'abort', variant: 'danger' as const }
+                ]
+              );
+
+              if (choice === 'abort') {
+                throw new Error('Generación cancelada por versículos faltantes.');
+              } else if (choice === 'keep_custom') {
+                useDb = false; // Just use slideText directly
+              }
+              // If 'fill_missing', we continue and pull from DB for any verse that is missing in customSplitTexts
+            }
+
             const rangeVerses: { text: string; num: number }[] = [];
             for (let v = verseStart; v <= verseEnd; v++) {
               let verseText = '';
               const customIdx = v - verseStart;
               
-              if (customSplitTexts.length > customIdx && customSplitTexts[customIdx]) {
+              if (slideText && customSplitTexts.length > customIdx && customSplitTexts[customIdx]) {
                 verseText = customSplitTexts[customIdx];
-              } else if (bible) {
-                const book = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
-                if (book) {
-                  const chapter = book.chapters[chapterNum - 1];
-                  if (chapter && chapter.is_chapter) {
-                    const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(v));
-                    if (vItem) {
-                      verseText = vItem.lines.join(' ');
-                    }
+              }
+              
+              // If verseText is empty and we are allowed to use DB
+              if (!verseText && useDb && bible && matchedBook) {
+                const chapter = matchedBook.chapters[chapterNum - 1];
+                if (chapter && chapter.is_chapter) {
+                  const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(v));
+                  if (vItem) {
+                    verseText = vItem.lines.join(' ');
                   }
                 }
               }
@@ -407,8 +582,6 @@ export default function App() {
             const totalLength = combinedText.length;
 
             if (totalLength <= 260) {
-              // Short enough to fit on a single slide.
-              // Apply chunking just in case it is still slightly long
               const chunks = splitLongTextIntoChunks(combinedText, 280);
               for (const chunk of chunks) {
                 parsedSlides.push({
@@ -419,8 +592,6 @@ export default function App() {
                 });
               }
             } else {
-              // Too long, create a slide for each verse.
-              // If a single verse is still too long, chunk it as well!
               for (const rv of rangeVerses) {
                 const chunks = splitLongTextIntoChunks(rv.text, 280);
                 for (const chunk of chunks) {
@@ -436,15 +607,12 @@ export default function App() {
           } else {
             // Single verse
             let fetchedText = '';
-            if (!slideText && bible) {
-              const book = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
-              if (book) {
-                const chapter = book.chapters[chapterNum - 1];
-                if (chapter && chapter.is_chapter) {
-                  const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(verseStart));
-                  if (vItem) {
-                    fetchedText = vItem.lines.join(' ');
-                  }
+            if (useDb && !slideText && bible && matchedBook) {
+              const chapter = matchedBook.chapters[chapterNum - 1];
+              if (chapter && chapter.is_chapter) {
+                const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(verseStart));
+                if (vItem) {
+                  fetchedText = vItem.lines.join(' ');
                 }
               }
             }
@@ -480,9 +648,14 @@ export default function App() {
       } else {
         alert("No se pudo extraer ninguna diapositiva del texto.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Ocurrió un error al generar las diapositivas.");
+      if (err.message && err.message.includes('Generación cancelada')) {
+        // Inform cleaner than raw alert
+        setExportProgress('');
+      } else {
+        alert("Ocurrió un error al generar las diapositivas.");
+      }
     } finally {
       setIsExporting(false);
     }
@@ -844,6 +1017,31 @@ export default function App() {
         isExporting={isExporting}
         exportProgress={exportProgress}
       />
+      {/* Operator Warning / Error Dialog Modal */}
+      {operatorError && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <div className="modal-header">
+              <AlertTriangle size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <h3>{operatorError.title}</h3>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, whiteSpace: 'pre-line' }}>{operatorError.message}</p>
+            </div>
+            <div className="modal-actions">
+              {operatorError.options.map((opt, idx) => (
+                <button
+                  key={idx}
+                  className={`modal-btn ${opt.variant || 'secondary'}`}
+                  onClick={opt.action}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
