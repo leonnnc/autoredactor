@@ -723,8 +723,8 @@ export default function App() {
     document.body.appendChild(container);
 
     const slideEl = document.createElement('div');
-    slideEl.style.width = '100%';
-    slideEl.style.height = '100%';
+    slideEl.style.width = `${dims.width}px`;
+    slideEl.style.height = `${dims.height}px`;
     slideEl.style.display = 'flex';
     slideEl.style.flexDirection = 'column';
     slideEl.style.justifyContent = style.verticalAlign;
