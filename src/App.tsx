@@ -42,16 +42,10 @@ const DEFAULT_GLOBAL_STYLE: SlideStyle = {
 
 const DEFAULT_SLIDES: Slide[] = [
   {
-    id: 'welcome-slide-1',
-    text: 'Bienvenidos a la Casa de Dios\n\n"Yo me alegré con los que me decían:\nA la casa de Jehová iremos."',
-    reference: 'Salmos 122:1 (RVR1960)',
-    isVerse: true,
-  },
-  {
-    id: 'welcome-slide-2',
-    text: 'Busquen primeramente el reino de Dios y su justicia, y todas estas cosas les serán añadidas.',
-    reference: 'Mateo 6:33 (NVI)',
-    isVerse: true,
+    id: 'slide-1',
+    text: 'Nueva Diapositiva',
+    reference: '',
+    isVerse: false,
   }
 ];
 
