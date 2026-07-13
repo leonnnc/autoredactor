@@ -402,13 +402,50 @@ export default function App() {
     try {
       // Split by double line break or manual page break '---'
       const rawSegments = sermonText.split(/---|\n\s*\n/);
-      const parsedSlides: Slide[] = [];
-
+      
       // Regex to detect Spanish bible references: (1? \s* [letras]) [cap]:[vers] (optional [version])
       // E.g. "Génesis 1:1", "1 Corintios 13:4-8", "Juan 3:16 TLA", "Hechos 2:1 (NVI)"
       const refRegex = /((?:[1-3]\s+)?[a-zA-ZáéíóúÁÉÍÓÚñÑ]+)\s+(\d+):(\d+)(?:-(\d+))?(?:\s*(?:["'(\[]\s*)?([a-zA-Z0-9]+)(?:\s*["')\]])?)?/i;
 
-      for (const segment of rawSegments) {
+      // Pre-process segments to merge reference-only segments with their following text segments
+      const processedSegments: string[] = [];
+      for (let i = 0; i < rawSegments.length; i++) {
+        const current = rawSegments[i].trim();
+        if (!current) continue;
+        
+        let isOnlyRef = false;
+        const currentMatch = current.match(refRegex);
+        if (currentMatch) {
+          let fullMatchText = currentMatch[0];
+          if (currentMatch[5] && !KNOWN_VERSIONS.includes(currentMatch[5].toLowerCase())) {
+            const lastCoords = `${currentMatch[2]}:${currentMatch[3]}` + (currentMatch[4] ? `-${currentMatch[4]}` : '');
+            const lastIndex = current.indexOf(lastCoords);
+            if (lastIndex !== -1) {
+              fullMatchText = current.substring(current.indexOf(currentMatch[1]), lastIndex + lastCoords.length);
+            }
+          }
+          const remainder = current.replace(fullMatchText, '').replace(/^[:\s\-()[\]"']+|[:\s\-()[\]"']+$/g, '').trim();
+          if (remainder.length === 0) {
+            isOnlyRef = true;
+          }
+        }
+        
+        if (isOnlyRef && i + 1 < rawSegments.length) {
+          const next = rawSegments[i + 1].trim();
+          const nextMatch = next.match(refRegex);
+          if (!nextMatch) {
+            processedSegments.push(current + "\n" + next);
+            i++;
+            continue;
+          }
+        }
+        
+        processedSegments.push(current);
+      }
+
+      const parsedSlides: Slide[] = [];
+
+      for (const segment of processedSegments) {
         const trimmed = segment.trim();
         if (!trimmed) continue;
 
