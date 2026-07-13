@@ -61,9 +61,9 @@ export const SermonInputPanel: React.FC<SermonInputPanelProps> = ({
   const [searchResults, setSearchResults] = useState<{ reference: string; text: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
-  // Dynamic variables based on loaded Bible
   const currentBook: BibleBook | undefined = bibleData?.books[selectedBookIndex];
-  const currentChapter: BibleChapter | undefined = currentBook?.chapters[selectedChapterIndex];
+  const actualChapters = currentBook?.chapters.filter(c => c.is_chapter) || [];
+  const currentChapter: BibleChapter | undefined = actualChapters[selectedChapterIndex];
   
   // Total chapters in selected book
   const totalChapters = currentBook?.chapters.filter(c => c.is_chapter).length || 0;
@@ -109,16 +109,16 @@ export const SermonInputPanel: React.FC<SermonInputPanelProps> = ({
       
       // Iterate through books, chapters, and verses
       for (const book of bibleData.books) {
-        for (let cIdx = 0; cIdx < book.chapters.length; cIdx++) {
-          const ch = book.chapters[cIdx];
-          if (!ch.is_chapter) continue;
+        const actualChapters = book.chapters.filter(ch => ch.is_chapter);
+        for (let chNum = 1; chNum <= actualChapters.length; chNum++) {
+          const ch = actualChapters[chNum - 1];
           
           for (const item of ch.items) {
             if (item.type !== 'verse') continue;
             
             const verseText = item.lines.join(' ');
             if (verseText.toLowerCase().includes(query)) {
-              const ref = `${book.name} ${cIdx + 1}:${item.verse_numbers.join('-')}`;
+              const ref = `${book.name} ${chNum}:${item.verse_numbers.join('-')}`;
               results.push({ reference: ref, text: verseText });
               
               if (results.length >= 60) break; // Limit search results to avoid DOM bloat

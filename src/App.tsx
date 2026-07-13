@@ -519,11 +519,12 @@ export default function App() {
 
             // ERROR 2: Chapter or Verse Out of Bounds
             if (useDb && matchedBook) {
-              const chapter = matchedBook.chapters[chapterNum - 1];
-              if (!chapter || !chapter.is_chapter) {
+              const actualChapters = matchedBook.chapters.filter(ch => ch.is_chapter);
+              const chapter = actualChapters[chapterNum - 1];
+              if (!chapter) {
                 const choice = await askOperator(
                   "Capítulo Inexistente ⚠️",
-                  `El libro "${bookName}" solo tiene ${matchedBook.chapters.length} capítulos. Intentaste buscar el capítulo ${chapterNum}.\n¿Cómo deseas proceder?`,
+                  `El libro "${bookName}" solo tiene ${actualChapters.length} capítulos. Intentaste buscar el capítulo ${chapterNum}.\n¿Cómo deseas proceder?`,
                   [
                     { label: "Tratar como texto normal", value: 'text_fallback', variant: 'primary' as const },
                     { label: "Detener generación", value: 'abort', variant: 'danger' as const }
@@ -583,8 +584,9 @@ export default function App() {
               
               // If verseText is empty and we are allowed to use DB
               if (!verseText && useDb && bible && matchedBook) {
-                const chapter = matchedBook.chapters[chapterNum - 1];
-                if (chapter && chapter.is_chapter) {
+                const actualChapters = matchedBook.chapters.filter(ch => ch.is_chapter);
+                const chapter = actualChapters[chapterNum - 1];
+                if (chapter) {
                   const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(v));
                   if (vItem) {
                     verseText = vItem.lines.join(' ');
@@ -629,8 +631,9 @@ export default function App() {
             // Single verse
             let fetchedText = '';
             if (useDb && !slideText && bible && matchedBook) {
-              const chapter = matchedBook.chapters[chapterNum - 1];
-              if (chapter && chapter.is_chapter) {
+              const actualChapters = matchedBook.chapters.filter(ch => ch.is_chapter);
+              const chapter = actualChapters[chapterNum - 1];
+              if (chapter) {
                 const vItem = chapter.items.find(item => item.type === 'verse' && item.verse_numbers.includes(verseStart));
                 if (vItem) {
                   fetchedText = vItem.lines.join(' ');
