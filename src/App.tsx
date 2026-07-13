@@ -47,6 +47,7 @@ const DEFAULT_SLIDES: Slide[] = [
     text: 'Nueva Diapositiva',
     reference: '',
     isVerse: false,
+    customStyle: { paddingX: 10 }
   }
 ];
 
@@ -301,6 +302,7 @@ export default function App() {
       text: 'Nueva Diapositiva',
       reference: '',
       isVerse: false,
+      customStyle: { paddingX: 10 }
     };
     setSlides([...slides, newSlide]);
     setActiveSlideId(newSlide.id);
@@ -372,6 +374,7 @@ export default function App() {
       text,
       reference,
       isVerse: true,
+      customStyle: { paddingX: 18 }
     };
     setSlides(prev => [...prev, newSlide]);
     setActiveSlideId(newSlide.id);
@@ -386,6 +389,7 @@ export default function App() {
         text: 'Nueva Diapositiva',
         reference: '',
         isVerse: false,
+        customStyle: { paddingX: 10 }
       };
       setSlides([firstSlide]);
       setActiveSlideId(firstSlide.id);
@@ -620,7 +624,8 @@ export default function App() {
                   id: Math.random().toString(36).substr(2, 9),
                   text: chunk,
                   reference: `${bookName} ${chapterNum}:${verseStart}-${verseEnd} (${finalVersion.toUpperCase()})`,
-                  isVerse: true
+                  isVerse: true,
+                  customStyle: { paddingX: 18 }
                 });
               }
             } else {
@@ -631,7 +636,8 @@ export default function App() {
                     id: Math.random().toString(36).substr(2, 9),
                     text: chunk,
                     reference: `${bookName} ${chapterNum}:${rv.num} (${finalVersion.toUpperCase()})`,
-                    isVerse: true
+                    isVerse: true,
+                    customStyle: { paddingX: 18 }
                   });
                 }
               }
@@ -666,7 +672,8 @@ export default function App() {
                 id: Math.random().toString(36).substr(2, 9),
                 text: chunk,
                 reference: `${bookName} ${chapterNum}:${verseStart} (${finalVersion.toUpperCase()})`,
-                isVerse: true
+                isVerse: true,
+                customStyle: { paddingX: 18 }
               });
             }
           }
@@ -678,7 +685,8 @@ export default function App() {
               id: Math.random().toString(36).substr(2, 9),
               text: chunk,
               reference: '',
-              isVerse: false
+              isVerse: false,
+              customStyle: { paddingX: 10 }
             });
           }
         }
