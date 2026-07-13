@@ -54,21 +54,25 @@ const splitCustomTextByVerses = (text: string, start: number, end: number): stri
   const results: string[] = [];
   const currentText = text.trim();
   
-  // Find the index of each verse number in the text
   const splitIndices: { verse: number; index: number }[] = [];
+  let lastSearchIndex = 0;
+
   for (let v = start; v <= end; v++) {
-    // Match the number as a standalone token
-    const regex = new RegExp(`(?:^|\\s)(${v})(?:\\s|\\u00a0|\\.|\\:)`, 'm');
-    const match = currentText.match(regex);
+    const searchSub = currentText.substring(lastSearchIndex);
+    // Allow punctuation or spaces before the number, and punctuation/spaces/end of line after it
+    const regex = new RegExp(`(?:^|[\\s.,;()\\u00a0\\[\\]"'])(${v})(?:[\\s.,;()\\u00a0\\[\\]"']|$)`, 'm');
+    const match = searchSub.match(regex);
+    
     if (match && match.index !== undefined) {
-      // Find where the verse number starts inside the match
-      const numIndex = match.index + match[0].indexOf(String(v));
-      splitIndices.push({ verse: v, index: numIndex });
+      const matchedNumOffset = match.index + match[0].indexOf(String(v));
+      const absoluteIndex = lastSearchIndex + matchedNumOffset;
+      
+      splitIndices.push({ verse: v, index: absoluteIndex });
+      lastSearchIndex = absoluteIndex + String(v).length;
     }
   }
 
   if (splitIndices.length > 0) {
-    // Sort splits in order of index
     splitIndices.sort((a, b) => a.index - b.index);
 
     for (let i = 0; i < splitIndices.length; i++) {
@@ -79,7 +83,6 @@ const splitCustomTextByVerses = (text: string, start: number, end: number): stri
       const textEnd = next ? next.index : currentText.length;
       
       let verseText = currentText.substring(textStart, textEnd).trim();
-      // Remove leading dots, hyphens, colons, spaces, quotes
       verseText = verseText.replace(/^[:\s\-()[\]"'.]+/g, '');
       results.push(verseText);
     }
