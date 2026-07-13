@@ -15,7 +15,8 @@ export interface SlideStyle {
   backgroundImage: string; // URL or base64 data
   overlayOpacity: number; // 0 to 1
   overlayColor: string; // hex color for background overlay
-  padding: number; // padding in percentage or px
+  paddingX: number; // horizontal padding in percentage
+  paddingY: number; // vertical padding in percentage
   bold: boolean;
   italic: boolean;
   uppercase: boolean;

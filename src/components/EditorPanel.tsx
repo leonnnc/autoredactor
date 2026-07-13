@@ -329,19 +329,35 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 );
               })}
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span className="form-label" style={{ fontSize: '10px' }}>Margen / Padding</span>
-                <span className="range-value" style={{ fontSize: '11px' }}>{currentStyle.padding}%</span>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="form-label" style={{ fontSize: '10px' }}>Margen Lateral</span>
+                  <span className="range-value" style={{ fontSize: '11px' }}>{currentStyle.paddingX}%</span>
+                </div>
+                <input 
+                  type="range" 
+                  className="range-slider"
+                  min="2" 
+                  max="35" 
+                  value={currentStyle.paddingX}
+                  onChange={(e) => updateStyle({ paddingX: parseInt(e.target.value) })}
+                />
               </div>
-              <input 
-                type="range" 
-                className="range-slider"
-                min="2" 
-                max="24" 
-                value={currentStyle.padding}
-                onChange={(e) => updateStyle({ padding: parseInt(e.target.value) })}
-              />
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="form-label" style={{ fontSize: '10px' }}>Margen Vertical</span>
+                  <span className="range-value" style={{ fontSize: '11px' }}>{currentStyle.paddingY}%</span>
+                </div>
+                <input 
+                  type="range" 
+                  className="range-slider"
+                  min="2" 
+                  max="30" 
+                  value={currentStyle.paddingY}
+                  onChange={(e) => updateStyle({ paddingY: parseInt(e.target.value) })}
+                />
+              </div>
             </div>
           </div>
         </div>

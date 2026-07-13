@@ -28,7 +28,8 @@ const DEFAULT_GLOBAL_STYLE: SlideStyle = {
   backgroundImage: '',
   overlayOpacity: 0.4,
   overlayColor: '#000000',
-  padding: 8,
+  paddingX: 10,
+  paddingY: 8,
   bold: false,
   italic: false,
   uppercase: false,
@@ -371,7 +372,10 @@ export default function App() {
     slideEl.style.flexDirection = 'column';
     slideEl.style.justifyContent = style.verticalAlign;
     slideEl.style.alignItems = style.horizontalAlign;
-    slideEl.style.padding = `${style.padding}%`;
+    slideEl.style.paddingLeft = `${style.paddingX}%`;
+    slideEl.style.paddingRight = `${style.paddingX}%`;
+    slideEl.style.paddingTop = `${style.paddingY}%`;
+    slideEl.style.paddingBottom = `${style.paddingY}%`;
     slideEl.style.boxSizing = 'border-box';
     slideEl.style.position = 'relative';
     slideEl.style.overflow = 'hidden';
