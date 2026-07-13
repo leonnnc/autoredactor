@@ -598,6 +598,15 @@ export default function App() {
                 verseText = slideText || `Versículo ${v}`;
               }
               
+              const vPrefix = `${v}`;
+              const vTrimmed = verseText.trim();
+              const startsWithVNum = new RegExp(`^${vPrefix}(?:[\\s.,;()\\u00a0\\[\\]"']|$)`);
+              if (!startsWithVNum.test(vTrimmed)) {
+                verseText = `${vPrefix} ${vTrimmed}`;
+              } else {
+                verseText = vTrimmed;
+              }
+              
               rangeVerses.push({ text: verseText, num: v });
             }
 
@@ -641,7 +650,16 @@ export default function App() {
               }
             }
 
-            const targetText = slideText || fetchedText || trimmed;
+            let targetText = slideText || fetchedText || trimmed;
+            const singlePrefix = `${verseStart}`;
+            const singleTrimmed = targetText.trim();
+            const startsWithSingleNum = new RegExp(`^${singlePrefix}(?:[\\s.,;()\\u00a0\\[\\]"']|$)`);
+            if (!startsWithSingleNum.test(singleTrimmed)) {
+              targetText = `${singlePrefix} ${singleTrimmed}`;
+            } else {
+              targetText = singleTrimmed;
+            }
+
             const chunks = splitLongTextIntoChunks(targetText, 280);
             for (const chunk of chunks) {
               parsedSlides.push({
