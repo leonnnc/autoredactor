@@ -494,23 +494,26 @@ export default function App() {
               const allBookNames = bible.books.map(b => b.name);
               const suggestion = findClosestBookName(bookName, allBookNames);
               
-              const choice = await askOperator(
-                "Libro No Reconocido ⚠️",
-                `El libro "${bookName}" no se encontró en la versión ${finalVersion.toUpperCase()}.\n${suggestion ? `¿Quisiste decir "${suggestion}"?` : 'Por favor verifica la ortografía.'}`,
-                [
-                  ...(suggestion ? [{ label: `Sí, corregir a "${suggestion}"`, value: 'use_suggestion', variant: 'primary' as const }] : []),
-                  { label: "Tratar como texto normal", value: 'text_fallback', variant: 'secondary' as const },
-                  { label: "Detener generación", value: 'abort', variant: 'danger' as const }
-                ]
-              );
-
-              if (choice === 'abort') {
-                throw new Error('Generación cancelada por el operador para corregir el texto.');
-              } else if (choice === 'use_suggestion' && suggestion) {
+              if (suggestion) {
+                // Resolve silently and automatically!
                 bookName = suggestion;
                 matchedBook = bible.books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
               } else {
-                useDb = false;
+                // Unresolvable without operator choice
+                const choice = await askOperator(
+                  "Libro No Reconocido ⚠️",
+                  `El libro "${bookName}" no se encontró en la versión ${finalVersion.toUpperCase()} y no pudimos identificar a cuál correspondía.\n¿Cómo deseas proceder?`,
+                  [
+                    { label: "Tratar como texto normal", value: 'text_fallback', variant: 'primary' as const },
+                    { label: "Detener generación", value: 'abort', variant: 'danger' as const }
+                  ]
+                );
+
+                if (choice === 'abort') {
+                  throw new Error('Generación cancelada por el operador para corregir el texto.');
+                } else {
+                  useDb = false;
+                }
               }
             }
 
@@ -567,26 +570,7 @@ export default function App() {
               customSplitTexts = splitCustomTextByVerses(slideText, verseStart, verseEnd);
             }
 
-            // ERROR 3: Missing verses in pasted range
-            if (useDb && slideText && customSplitTexts.length < (verseEnd - verseStart + 1)) {
-              const expectedCount = verseEnd - verseStart + 1;
-              const choice = await askOperator(
-                "Versículos Faltantes en Texto Pegado ⚠️",
-                `Para el pasaje "${bookName} ${chapterNum}:${verseStart}-${verseEnd}", pegaste texto personalizado pero se detectaron ${customSplitTexts.length} versículos de los ${expectedCount} esperados.\n¿Cómo deseas proceder?`,
-                [
-                  { label: "Autocompletar faltantes de la Biblia", value: 'fill_missing', variant: 'primary' as const },
-                  { label: "Ignorar y usar solo mi texto", value: 'keep_custom', variant: 'secondary' as const },
-                  { label: "Detener generación", value: 'abort', variant: 'danger' as const }
-                ]
-              );
-
-              if (choice === 'abort') {
-                throw new Error('Generación cancelada por versículos faltantes.');
-              } else if (choice === 'keep_custom') {
-                useDb = false; // Just use slideText directly
-              }
-              // If 'fill_missing', we continue and pull from DB for any verse that is missing in customSplitTexts
-            }
+            // ERROR 3: Missing verses in pasted range (Resolved silently by autocompleting missing verses from DB if useDb is true)
 
             const rangeVerses: { text: string; num: number }[] = [];
             for (let v = verseStart; v <= verseEnd; v++) {
