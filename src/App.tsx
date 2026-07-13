@@ -859,13 +859,22 @@ export default function App() {
     setIsExporting(true);
     const zip = new JSZip();
     try {
-      for (let i = 0; i < slides.length; i++) {
-        setExportProgress(`Capturando diapositiva ${i + 1} de ${slides.length}...`);
-        const dataUrl = await captureFullResolutionSlide(slides[i]);
-        // Extract base64 clean string
-        const base64Data = dataUrl.split(',')[1];
-        zip.file(`diapositiva_${i + 1}.jpg`, base64Data, { base64: true });
+      let completedCount = 0;
+      const capturePromises = slides.map(async (slide, index) => {
+        const dataUrl = await captureFullResolutionSlide(slide);
+        completedCount++;
+        setExportProgress(`Capturando diapositiva ${completedCount} de ${slides.length}...`);
+        return { index, dataUrl };
+      });
+
+      const results = await Promise.all(capturePromises);
+      results.sort((a, b) => a.index - b.index);
+
+      for (const res of results) {
+        const base64Data = res.dataUrl.split(',')[1];
+        zip.file(`diapositiva_${res.index + 1}.jpg`, base64Data, { base64: true });
       }
+
       setExportProgress('Comprimiendo archivo ZIP...');
       const content = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
@@ -892,22 +901,29 @@ export default function App() {
         format: [dims.width, dims.height]
       });
 
-      for (let i = 0; i < slides.length; i++) {
-        setExportProgress(`Renderizando PDF: página ${i + 1} de ${slides.length}...`);
-        const dataUrl = await captureFullResolutionSlide(slides[i]);
-        
+      let completedCount = 0;
+      const capturePromises = slides.map(async (slide, index) => {
+        const dataUrl = await captureFullResolutionSlide(slide);
+        completedCount++;
+        setExportProgress(`Renderizando PDF: página ${completedCount} de ${slides.length}...`);
+        return { index, dataUrl };
+      });
+
+      const results = await Promise.all(capturePromises);
+      results.sort((a, b) => a.index - b.index);
+
+      for (let i = 0; i < results.length; i++) {
         if (i > 0) {
           pdf.addPage([dims.width, dims.height], orientation);
         }
-        
-        pdf.addImage(dataUrl, 'JPEG', 0, 0, dims.width, dims.height);
+        pdf.addImage(results[i].dataUrl, 'JPEG', 0, 0, dims.width, dims.height);
       }
 
-      setExportProgress('Guardando documento PDF...');
-      pdf.save(`presentacion_predica.pdf`);
+      setExportProgress('Generando archivo PDF...');
+      pdf.save(`diapositivas_predica.pdf`);
     } catch (err) {
       console.error(err);
-      alert('Error al generar el PDF.');
+      alert('Error al generar el archivo PDF.');
     } finally {
       setIsExporting(false);
     }
@@ -929,13 +945,21 @@ export default function App() {
         pptx.layout = 'LAYOUT_16x9';
       }
 
-      for (let i = 0; i < slides.length; i++) {
-        setExportProgress(`Preparando PPTX: diapositiva ${i + 1} de ${slides.length}...`);
-        const dataUrl = await captureFullResolutionSlide(slides[i]);
-        
+      let completedCount = 0;
+      const capturePromises = slides.map(async (slide, index) => {
+        const dataUrl = await captureFullResolutionSlide(slide);
+        completedCount++;
+        setExportProgress(`Preparando PPTX: diapositiva ${completedCount} de ${slides.length}...`);
+        return { index, dataUrl };
+      });
+
+      const results = await Promise.all(capturePromises);
+      results.sort((a, b) => a.index - b.index);
+
+      for (const res of results) {
         const pptxSlide = pptx.addSlide();
         pptxSlide.addImage({
-          data: dataUrl,
+          data: res.dataUrl,
           x: 0,
           y: 0,
           w: '100%',
